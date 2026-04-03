@@ -1,0 +1,441 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
+}
+
+enum ChallengeStatus {
+  DRAFT
+  ACTIVE
+  RETIRED
+}
+
+enum SessionMode {
+  PRACTICE
+  DAILY
+  RANKED
+  MULTIPLAYER
+}
+
+enum GameSessionStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+  ABANDONED
+}
+
+enum SubmissionVerdict {
+  CORRECT
+  INCORRECT
+  COMPILE_ERROR
+  TIMEOUT
+}
+
+enum MatchTier {
+  EXACT
+  NORMALIZED
+  RENDERED
+  ALTERNATE
+  NONE
+}
+
+enum ArtifactRole {
+  CANONICAL
+  ALTERNATE
+  REFERENCE
+}
+
+enum SourceKind {
+  CANONICAL
+  ALTERNATE
+}
+
+enum DailyChallengeStatus {
+  SCHEDULED
+  ACTIVE
+  ARCHIVED
+}
+
+enum ScoreType {
+  ROUND
+  BONUS
+  PENALTY
+  FINAL
+}
+
+enum LeaderboardScope {
+  GLOBAL
+  DAILY
+  WEEKLY
+  SEASONAL
+}
+
+enum MultiplayerMode {
+  ASYNC
+  LIVE
+}
+
+enum MultiplayerMatchStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+model User {
+  id                  String                 @id @default(uuid()) @db.Uuid
+  username            String                 @unique @db.VarChar(40)
+  email               String?                @unique @db.VarChar(255)
+  passwordHash        String?                @db.Text
+  displayName         String?                @db.VarChar(80)
+  avatarUrl           String?                @db.Text
+  skillRating         Int                    @default(1000)
+  isAdmin             Boolean                @default(false)
+  createdAt           DateTime               @default(now()) @db.Timestamptz(6)
+  updatedAt           DateTime               @updatedAt @db.Timestamptz(6)
+  playerSessions      PlayerSession[]
+  gameSessions        GameSession[]
+  scoreRecords        ScoreRecord[]
+  leaderboardEntries  LeaderboardEntry[]
+  createdChallenges   Challenge[]            @relation("ChallengeCreator")
+  multiplayerPlayers  MultiplayerMatchPlayer[]
+
+  @@index([createdAt])
+}
+
+model PlayerSession {
+  id                  String                 @id @default(uuid()) @db.Uuid
+  userId              String?                @db.Uuid
+  guestTokenHash      String?                @db.Text
+  ipHash              String?                @db.Text
+  userAgent           String?                @db.Text
+  startedAt           DateTime               @default(now()) @db.Timestamptz(6)
+  lastSeenAt          DateTime               @default(now()) @db.Timestamptz(6)
+  expiresAt           DateTime?              @db.Timestamptz(6)
+  user                User?                  @relation(fields: [userId], references: [id])
+  gameSessions        GameSession[]
+  multiplayerPlayers  MultiplayerMatchPlayer[]
+
+  @@index([userId])
+  @@index([guestTokenHash])
+  @@index([lastSeenAt])
+}
+
+model ChallengeCategory {
+  id                  String                 @id @default(uuid()) @db.Uuid
+  slug                String                 @unique @db.VarChar(60)
+  name                String                 @db.VarChar(80)
+  description         String?                @db.Text
+  sortOrder           Int                    @default(0)
+  createdAt           DateTime               @default(now()) @db.Timestamptz(6)
+  challenges          Challenge[]
+
+  @@index([sortOrder])
+}
+
+model Tag {
+  id                  String                 @id @default(uuid()) @db.Uuid
+  slug                String                 @unique @db.VarChar(60)
+  label               String                 @db.VarChar(80)
+  createdAt           DateTime               @default(now()) @db.Timestamptz(6)
+  challengeTags       ChallengeTag[]
+}
+
+model Challenge {
+  id                         String                    @id @default(uuid()) @db.Uuid
+  slug                       String                    @unique @db.VarChar(100)
+  title                      String                    @db.VarChar(160)
+  description                String?                   @db.Text
+  categoryId                 String                    @db.Uuid
+  difficulty                 Int
+  status                     ChallengeStatus           @default(DRAFT)
+  canonicalSource            String                    @db.Text
+  normalizedCanonicalSource  String                    @db.Text
+  checkerVersion             Int                       @default(1)
+  canonicalArtifactId        String?                   @unique @db.Uuid
+  timeTargetMs               Int?
+  createdByUserId            String?                   @db.Uuid
+  createdAt                  DateTime                  @default(now()) @db.Timestamptz(6)
+  updatedAt                  DateTime                  @updatedAt @db.Timestamptz(6)
+  category                   ChallengeCategory         @relation(fields: [categoryId], references: [id])
+  canonicalArtifact          ChallengeRenderArtifact?  @relation("CanonicalArtifact", fields: [canonicalArtifactId], references: [id], onDelete: SetNull)
+  createdByUser              User?                     @relation("ChallengeCreator", fields: [createdByUserId], references: [id])
+  tags                       ChallengeTag[]
+  alternateSources           ChallengeAlternateSource[]
+  renderArtifacts            ChallengeRenderArtifact[] @relation("ChallengeArtifacts")
+  dailyItems                 DailyChallengeItem[]
+  rounds                     GameRound[]
+
+  @@index([status, categoryId, difficulty])
+  @@index([createdByUserId])
+}
+
+model ChallengeTag {
+  challengeId         String                 @db.Uuid
+  tagId               String                 @db.Uuid
+  createdAt           DateTime               @default(now()) @db.Timestamptz(6)
+  challenge           Challenge              @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  tag                 Tag                    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([challengeId, tagId])
+  @@index([tagId])
+}
+
+model ChallengeRenderArtifact {
+  id                    String                    @id @default(uuid()) @db.Uuid
+  challengeId           String                    @db.Uuid
+  artifactRole          ArtifactRole
+  sourceKind            SourceKind
+  sourceHash            String                    @db.Char(64)
+  svgStorageKey         String?                   @db.Text
+  svgInline             String?                   @db.Text
+  normalizedSvgHash     String                    @db.Char(64)
+  structuralFingerprint Json?
+  typstVersion          String?                   @db.VarChar(40)
+  renderEngineVersion   String?                   @db.VarChar(40)
+  compileDurationMs     Int?
+  widthPx               Int?
+  heightPx              Int?
+  viewBox               String?                   @db.VarChar(120)
+  createdAt             DateTime                  @default(now()) @db.Timestamptz(6)
+  challenge             Challenge                 @relation("ChallengeArtifacts", fields: [challengeId], references: [id], onDelete: Cascade)
+  canonicalForChallenge Challenge?                @relation("CanonicalArtifact")
+  alternateSources      ChallengeAlternateSource[]
+
+  @@unique([challengeId, artifactRole, normalizedSvgHash])
+  @@index([challengeId])
+  @@index([normalizedSvgHash])
+  @@index([challengeId, artifactRole])
+}
+
+model ChallengeAlternateSource {
+  id                  String                   @id @default(uuid()) @db.Uuid
+  challengeId         String                   @db.Uuid
+  sourceText          String                   @db.Text
+  normalizedSource    String                   @db.Text
+  artifactId          String?                  @db.Uuid
+  notes               String?                  @db.Text
+  createdAt           DateTime                 @default(now()) @db.Timestamptz(6)
+  challenge           Challenge                @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  artifact            ChallengeRenderArtifact? @relation(fields: [artifactId], references: [id], onDelete: SetNull)
+
+  @@unique([challengeId, normalizedSource])
+  @@index([challengeId])
+  @@index([normalizedSource])
+}
+
+model DailyChallenge {
+  id                  String                 @id @default(uuid()) @db.Uuid
+  challengeDate       DateTime               @unique @db.Date
+  title               String?                @db.VarChar(160)
+  seed                String                 @db.VarChar(120)
+  status              DailyChallengeStatus   @default(SCHEDULED)
+  createdAt           DateTime               @default(now()) @db.Timestamptz(6)
+  items               DailyChallengeItem[]
+  gameSessions        GameSession[]
+
+  @@index([status])
+}
+
+model DailyChallengeItem {
+  id                  String                 @id @default(uuid()) @db.Uuid
+  dailyChallengeId    String                 @db.Uuid
+  challengeId         String                 @db.Uuid
+  position            Int
+  createdAt           DateTime               @default(now()) @db.Timestamptz(6)
+  dailyChallenge      DailyChallenge         @relation(fields: [dailyChallengeId], references: [id], onDelete: Cascade)
+  challenge           Challenge              @relation(fields: [challengeId], references: [id])
+
+  @@unique([dailyChallengeId, position])
+  @@unique([dailyChallengeId, challengeId])
+  @@index([challengeId])
+}
+
+model MultiplayerMatch {
+  id                  String                 @id @default(uuid()) @db.Uuid
+  mode                MultiplayerMode
+  status              MultiplayerMatchStatus @default(PENDING)
+  seed                String                 @db.VarChar(120)
+  startedAt           DateTime?              @db.Timestamptz(6)
+  endedAt             DateTime?              @db.Timestamptz(6)
+  createdAt           DateTime               @default(now()) @db.Timestamptz(6)
+  gameSessions        GameSession[]
+  players             MultiplayerMatchPlayer[]
+
+  @@index([status, createdAt])
+}
+
+model GameSession {
+  id                  String                 @id @default(uuid()) @db.Uuid
+  playerSessionId     String                 @db.Uuid
+  userId              String?                @db.Uuid
+  mode                SessionMode
+  status              GameSessionStatus      @default(PENDING)
+  dailyChallengeId    String?                @db.Uuid
+  matchId             String?                @db.Uuid
+  startedAt           DateTime               @default(now()) @db.Timestamptz(6)
+  endedAt             DateTime?              @db.Timestamptz(6)
+  timeLimitMs         Int?
+  totalScore          Int                    @default(0)
+  accuracy            Decimal?               @db.Decimal(5, 4)
+  promptsAttempted    Int                    @default(0)
+  promptsCorrect      Int                    @default(0)
+  seed                String?                @db.VarChar(120)
+  metadata            Json?
+  playerSession       PlayerSession          @relation(fields: [playerSessionId], references: [id])
+  user                User?                  @relation(fields: [userId], references: [id])
+  dailyChallenge      DailyChallenge?        @relation(fields: [dailyChallengeId], references: [id])
+  match               MultiplayerMatch?      @relation(fields: [matchId], references: [id])
+  rounds              GameRound[]
+  scoreRecords        ScoreRecord[]
+  leaderboardEntries  LeaderboardEntry[]
+  multiplayerPlayers  MultiplayerMatchPlayer[]
+
+  @@index([userId])
+  @@index([playerSessionId])
+  @@index([mode, status, startedAt(sort: Desc)])
+  @@index([dailyChallengeId, totalScore(sort: Desc)])
+}
+
+model GameRound {
+  id                  String                 @id @default(uuid()) @db.Uuid
+  gameSessionId       String                 @db.Uuid
+  challengeId         String                 @db.Uuid
+  position            Int
+  presentedAt         DateTime               @default(now()) @db.Timestamptz(6)
+  resolvedAt          DateTime?              @db.Timestamptz(6)
+  bestSubmissionId    String?                @unique @db.Uuid
+  finalVerdict        SubmissionVerdict?
+  finalMatchTier      MatchTier?
+  timeTakenMs         Int?
+  scoreAwarded        Int                    @default(0)
+  metadata            Json?
+  gameSession         GameSession            @relation(fields: [gameSessionId], references: [id], onDelete: Cascade)
+  challenge           Challenge              @relation(fields: [challengeId], references: [id])
+  submissions         Submission[]           @relation("RoundSubmissions")
+  bestSubmission      Submission?            @relation("BestSubmission", fields: [bestSubmissionId], references: [id], onDelete: SetNull)
+  scoreRecords        ScoreRecord[]
+
+  @@unique([gameSessionId, position])
+  @@index([gameSessionId])
+  @@index([challengeId])
+  @@index([gameSessionId, position])
+}
+
+model Submission {
+  id                  String                   @id @default(uuid()) @db.Uuid
+  gameRoundId         String                   @db.Uuid
+  attemptNumber       Int
+  submittedAt         DateTime                 @default(now()) @db.Timestamptz(6)
+  rawSource           String                   @db.Text
+  normalizedSource    String                   @db.Text
+  sourceHash          String                   @db.Char(64)
+  checkerVersion      Int
+  verdict             SubmissionVerdict
+  matchTier           MatchTier
+  isAccepted          Boolean                  @default(false)
+  feedback            String?                  @db.Text
+  compileError        String?                  @db.Text
+  compileDurationMs   Int?
+  compareDurationMs   Int?
+  timeFromRoundStartMs Int?
+  renderFingerprint   String?                  @db.Char(64)
+  renderMetadata      Json?
+  gameRound           GameRound                @relation("RoundSubmissions", fields: [gameRoundId], references: [id], onDelete: Cascade)
+  bestForRound        GameRound?               @relation("BestSubmission")
+  renderArtifact      SubmissionRenderArtifact?
+
+  @@unique([gameRoundId, attemptNumber])
+  @@index([gameRoundId])
+  @@index([gameRoundId, submittedAt])
+  @@index([verdict, matchTier])
+  @@index([renderFingerprint])
+}
+
+model SubmissionRenderArtifact {
+  id                    String                 @id @default(uuid()) @db.Uuid
+  submissionId          String                 @unique @db.Uuid
+  svgStorageKey         String?                @db.Text
+  svgInline             String?                @db.Text
+  normalizedSvgHash     String?                @db.Char(64)
+  structuralFingerprint Json?
+  bboxMetadata          Json?
+  typstVersion          String?                @db.VarChar(40)
+  renderEngineVersion   String?                @db.VarChar(40)
+  createdAt             DateTime               @default(now()) @db.Timestamptz(6)
+  submission            Submission             @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@index([normalizedSvgHash])
+}
+
+model ScoreRecord {
+  id                  String                 @id @default(uuid()) @db.Uuid
+  gameSessionId       String                 @db.Uuid
+  gameRoundId         String?                @db.Uuid
+  userId              String?                @db.Uuid
+  scoreType           ScoreType
+  points              Int
+  createdAt           DateTime               @default(now()) @db.Timestamptz(6)
+  metadata            Json?
+  gameSession         GameSession            @relation(fields: [gameSessionId], references: [id], onDelete: Cascade)
+  gameRound           GameRound?             @relation(fields: [gameRoundId], references: [id], onDelete: SetNull)
+  user                User?                  @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([gameSessionId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model Leaderboard {
+  id                  String                 @id @default(uuid()) @db.Uuid
+  scope               LeaderboardScope
+  scopeKey            String                 @db.VarChar(120)
+  title               String                 @db.VarChar(160)
+  startsAt            DateTime?              @db.Timestamptz(6)
+  endsAt              DateTime?              @db.Timestamptz(6)
+  createdAt           DateTime               @default(now()) @db.Timestamptz(6)
+  entries             LeaderboardEntry[]
+
+  @@unique([scope, scopeKey])
+}
+
+model LeaderboardEntry {
+  id                  String                 @id @default(uuid()) @db.Uuid
+  leaderboardId       String                 @db.Uuid
+  userId              String?                @db.Uuid
+  gameSessionId       String                 @db.Uuid
+  displayName         String                 @db.VarChar(80)
+  score               Int
+  accuracy            Decimal                @db.Decimal(5, 4)
+  rank                Int?
+  recordedAt          DateTime               @default(now()) @db.Timestamptz(6)
+  leaderboard         Leaderboard            @relation(fields: [leaderboardId], references: [id], onDelete: Cascade)
+  user                User?                  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  gameSession         GameSession            @relation(fields: [gameSessionId], references: [id], onDelete: Cascade)
+
+  @@unique([leaderboardId, gameSessionId])
+  @@index([leaderboardId, score(sort: Desc), recordedAt])
+  @@index([leaderboardId, rank])
+  @@index([userId])
+}
+
+model MultiplayerMatchPlayer {
+  id                  String                 @id @default(uuid()) @db.Uuid
+  multiplayerMatchId  String                 @db.Uuid
+  userId              String?                @db.Uuid
+  playerSessionId     String?                @db.Uuid
+  gameSessionId       String?                @db.Uuid
+  joinedAt            DateTime               @default(now()) @db.Timestamptz(6)
+  finalPlace          Int?
+  multiplayerMatch    MultiplayerMatch       @relation(fields: [multiplayerMatchId], references: [id], onDelete: Cascade)
+  user                User?                  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  playerSession       PlayerSession?         @relation(fields: [playerSessionId], references: [id], onDelete: SetNull)
+  gameSession         GameSession?           @relation(fields: [gameSessionId], references: [id], onDelete: SetNull)
+
+  @@index([multiplayerMatchId])
+  @@index([userId])
+}

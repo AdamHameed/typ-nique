@@ -1,0 +1,12 @@
+.next
+node_modules
+dist
+.turbo
+.env
+.env.local
+.env.*.local
+coverage
+*.log
+prisma/dev.db
+tmp
+storage

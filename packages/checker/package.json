@@ -1,0 +1,18 @@
+{
+  "name": "@typ-nique/checker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "dependencies": {
+    "@typ-nique/types": "workspace:*",
+    "@typ-nique/typst-utils": "workspace:*"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json --emitDeclarationOnly",
+    "test": "node --import tsx --test ./test/*.test.ts",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  }
+}

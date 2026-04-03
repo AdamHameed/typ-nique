@@ -1,0 +1,27 @@
+{
+  "name": "@typ-nique/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "generate": "dotenv -e ../.env -- prisma generate",
+    "migrate": "dotenv -e ../.env -- prisma migrate dev --name init",
+    "seed": "dotenv -e ../.env -- tsx prisma/seed.ts",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "@typ-nique/typst-utils": "workspace:*",
+    "@typ-nique/validation": "workspace:*"
+  },
+  "devDependencies": {
+    "prisma": "^5.22.0",
+    "tsx": "^4.19.2"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  }
+}
