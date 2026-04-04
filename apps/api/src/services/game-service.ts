@@ -10,19 +10,40 @@ import type {
 import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
-import { getChallengeRotation } from "./challenge-service.js";
+import { ensureDailyChallengeForDate, getChallengeRotation } from "./challenge-service.js";
 
 const PRACTICE_DURATION_MS = 3 * 60 * 1000;
 
-export async function createGameSession(mode: "practice" | "daily"): Promise<GameSessionState> {
-  const challengePool = await getChallengeRotation(30);
+interface SessionActor {
+  userId: string | null;
+  playerSessionId: string | null;
+}
 
-  if (challengePool.length === 0) {
-    throw new Error("No active challenges are available.");
+export async function createGameSession(mode: "practice" | "daily", actor: SessionActor): Promise<GameSessionState> {
+  const startedAt = new Date();
+  const dailyChallenge = mode === "daily" ? await ensureDailyChallengeForDate(startedAt) : null;
+  const existingSession = await prisma.gameSession.findFirst({
+    where: {
+      mode: mode.toUpperCase() as "PRACTICE" | "DAILY",
+      status: "ACTIVE",
+      ...(actor.userId ? { userId: actor.userId } : { playerSessionId: actor.playerSessionId! }),
+      ...(mode === "daily" ? { dailyChallengeId: dailyChallenge?.id } : {})
+    },
+    orderBy: { startedAt: "desc" }
+  });
+
+  if (existingSession) {
+    return getGameSessionStateOrThrow(existingSession.id);
   }
 
-  const challengeIds = shuffle(challengePool.map((challenge) => challenge.id));
-  const startedAt = new Date();
+  const challengeIds =
+    mode === "daily"
+      ? dailyChallenge?.items.map((item) => item.challengeId) ?? []
+      : shuffle((await getChallengeRotation(30)).map((challenge) => challenge.id));
+
+  if (challengeIds.length === 0) {
+    throw new Error("No active challenges are available.");
+  }
 
   const session = await prisma.gameSession.create({
     data: {
@@ -31,13 +52,12 @@ export async function createGameSession(mode: "practice" | "daily"): Promise<Gam
       startedAt,
       timeLimitMs: PRACTICE_DURATION_MS,
       seed: randomUUID(),
+      playerSessionId: actor.playerSessionId!,
+      userId: actor.userId,
+      dailyChallengeId: dailyChallenge?.id,
       metadata: {
-        challengeIds
-      },
-      playerSession: {
-        create: {
-          guestTokenHash: randomUUID()
-        }
+        challengeIds,
+        dailyChallengeDate: dailyChallenge?.challengeDate.toISOString() ?? null
       },
       rounds: {
         create: {
@@ -51,20 +71,27 @@ export async function createGameSession(mode: "practice" | "daily"): Promise<Gam
   return getGameSessionStateOrThrow(session.id);
 }
 
-export async function getGameSessionState(sessionId: string): Promise<GameSessionState | null> {
+export async function getGameSessionState(sessionId: string, actor: SessionActor): Promise<GameSessionState | null> {
   const session = await prisma.gameSession.findUnique({
-    where: { id: sessionId }
+    where: { id: sessionId },
+    select: {
+      id: true,
+      userId: true,
+      playerSessionId: true
+    }
   });
 
   if (!session) {
     return null;
   }
 
+  assertSessionAccess(session, actor);
+
   await ensureSessionProgression(sessionId);
   return getGameSessionStateOrThrow(sessionId);
 }
 
-export async function skipCurrentRound(sessionId: string, roundId: string): Promise<GameSessionState> {
+export async function skipCurrentRound(sessionId: string, roundId: string, actor: SessionActor): Promise<GameSessionState> {
   const round = await prisma.gameRound.findUnique({
     where: { id: roundId },
     include: { gameSession: true }
@@ -73,6 +100,8 @@ export async function skipCurrentRound(sessionId: string, roundId: string): Prom
   if (!round || round.gameSessionId !== sessionId) {
     throw new Error("Round not found for session.");
   }
+
+  assertSessionAccess(round.gameSession, actor);
 
   await expireSessionIfNeeded(round.gameSessionId);
 
@@ -103,7 +132,18 @@ export async function skipCurrentRound(sessionId: string, roundId: string): Prom
   return getGameSessionStateOrThrow(sessionId);
 }
 
-export async function finishGameSession(sessionId: string): Promise<GameSessionResult> {
+export async function finishGameSession(sessionId: string, actor: SessionActor): Promise<GameSessionResult> {
+  const session = await prisma.gameSession.findUniqueOrThrow({
+    where: { id: sessionId },
+    select: {
+      id: true,
+      userId: true,
+      playerSessionId: true
+    }
+  });
+
+  assertSessionAccess(session, actor);
+
   await prisma.gameSession.update({
     where: { id: sessionId },
     data: {
@@ -112,10 +152,10 @@ export async function finishGameSession(sessionId: string): Promise<GameSessionR
     }
   });
 
-  return getGameSessionResults(sessionId);
+  return getGameSessionResults(sessionId, actor);
 }
 
-export async function getGameSessionResults(sessionId: string): Promise<GameSessionResult> {
+export async function getGameSessionResults(sessionId: string, actor: SessionActor): Promise<GameSessionResult> {
   const session = await prisma.gameSession.findUnique({
     where: { id: sessionId },
     include: {
@@ -140,6 +180,8 @@ export async function getGameSessionResults(sessionId: string): Promise<GameSess
   if (!session) {
     throw new Error("Session not found.");
   }
+
+  assertSessionAccess(session, actor);
 
   const rounds: RoundBreakdown[] = session.rounds.map((round) => {
     const latestSubmission = round.bestSubmission ?? round.submissions[0] ?? null;
@@ -361,6 +403,24 @@ function toRoundPayload(
       renderHash: round.challenge.canonicalArtifact?.normalizedSvgHash
     }
   };
+}
+
+function assertSessionAccess(
+  session: {
+    userId: string | null;
+    playerSessionId: string;
+  },
+  actor: SessionActor
+) {
+  if (actor.userId && session.userId === actor.userId) {
+    return;
+  }
+
+  if (actor.playerSessionId && session.playerSessionId === actor.playerSessionId) {
+    return;
+  }
+
+  throw new Error("Session not accessible.");
 }
 
 function difficultyToLabel(difficulty: number): ChallengeDifficulty {

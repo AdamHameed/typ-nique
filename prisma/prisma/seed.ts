@@ -1,5 +1,5 @@
 import { Prisma } from "@prisma/client";
-import { createHash } from "node:crypto";
+import { createHash, randomBytes, scryptSync } from "node:crypto";
 import { normalizeSource, normalizeSvgMarkup, svgFingerprint } from "@typ-nique/typst-utils";
 import { prisma } from "../src/index.js";
 import { demoUsers, leaderboardSeeds } from "../seeds/demo-data.js";
@@ -70,9 +70,13 @@ async function main() {
       where: { username: user.username },
       update: {
         displayName: user.displayName,
-        email: user.email
+        email: user.email,
+        passwordHash: buildPasswordHash("typnique-demo")
       },
-      create: user
+      create: {
+        ...user,
+        passwordHash: buildPasswordHash("typnique-demo")
+      }
     });
   }
 
@@ -169,18 +173,36 @@ async function main() {
     }
   }
 
+  const today = new Date();
+  const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const tomorrowDate = new Date(todayDate);
+  tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+  const dailyScopeKey = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, "0")}-${String(
+    todayDate.getDate()
+  ).padStart(2, "0")}`;
+
   const dailyChallenge = await prisma.dailyChallenge.upsert({
-    where: { challengeDate: new Date("2026-04-03") },
+    where: { challengeDate: todayDate },
     update: {
       title: "Daily Sprint",
-      seed: "daily-2026-04-03",
+      seed: `daily-${dailyScopeKey}`,
       status: "ACTIVE"
     },
     create: {
-      challengeDate: new Date("2026-04-03"),
+      challengeDate: todayDate,
       title: "Daily Sprint",
-      seed: "daily-2026-04-03",
+      seed: `daily-${dailyScopeKey}`,
       status: "ACTIVE"
+    }
+  });
+
+  await prisma.dailyChallenge.updateMany({
+    where: {
+      id: { not: dailyChallenge.id },
+      status: "ACTIVE"
+    },
+    data: {
+      status: "ARCHIVED"
     }
   });
 
@@ -207,7 +229,7 @@ async function main() {
     where: {
       scope_scopeKey: {
         scope: "DAILY",
-        scopeKey: "2026-04-03"
+        scopeKey: dailyScopeKey
       }
     },
     update: {
@@ -215,10 +237,10 @@ async function main() {
     },
     create: {
       scope: "DAILY",
-      scopeKey: "2026-04-03",
+      scopeKey: dailyScopeKey,
       title: "Daily Leaderboard",
-      startsAt: new Date("2026-04-03T00:00:00Z"),
-      endsAt: new Date("2026-04-04T00:00:00Z")
+      startsAt: todayDate,
+      endsAt: tomorrowDate
     }
   });
 
@@ -244,13 +266,13 @@ async function main() {
         mode: "DAILY",
         status: "COMPLETED",
         dailyChallengeId: dailyChallenge.id,
-        startedAt: new Date("2026-04-03T12:00:00Z"),
-        endedAt: new Date("2026-04-03T12:04:00Z"),
+        startedAt: new Date(todayDate.getTime() + 12 * 60 * 60 * 1000),
+        endedAt: new Date(todayDate.getTime() + 12 * 60 * 60 * 1000 + 4 * 60 * 1000),
         totalScore: entry.score,
         accuracy: new Prisma.Decimal(entry.accuracy),
         promptsAttempted: 3,
         promptsCorrect: 3,
-        seed: "daily-2026-04-03"
+        seed: `daily-${dailyScopeKey}`
       }
     });
 
@@ -268,6 +290,12 @@ async function main() {
   }
 
   console.log("Seed data inserted.");
+}
+
+function buildPasswordHash(password: string) {
+  const salt = randomBytes(16).toString("hex");
+  const hash = scryptSync(password, salt, 64).toString("hex");
+  return `scrypt:${salt}:${hash}`;
 }
 
 main()

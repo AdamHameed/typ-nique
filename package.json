@@ -4,7 +4,12 @@
   "version": "0.1.0",
   "packageManager": "pnpm@9.15.0",
   "scripts": {
-    "dev": "turbo dev",
+    "dev": "bash ./scripts/dev-stack.sh",
+    "dev:workspace": "turbo dev",
+    "dev:stack": "bash ./scripts/dev-stack.sh",
+    "dev:stack:no-seed": "bash ./scripts/dev-stack.sh --no-seed",
+    "dev:stack:reset": "bash ./scripts/dev-stack.sh --reset",
+    "dev:stop": "bash ./scripts/reset-stack.sh",
     "build": "turbo build",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",

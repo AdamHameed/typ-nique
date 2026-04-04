@@ -1,26 +1,49 @@
 "use client";
 
-import { useId } from "react";
+import { useEffect, useId, useRef } from "react";
 import type { ChallengeInputMode } from "@typ-nique/types";
 
 interface TypstEditorProps {
   value: string;
   onChange: (value: string) => void;
-  onSkip: () => void;
   inputMode: ChallengeInputMode;
   disabled?: boolean;
   isSubmitting?: boolean;
+  autoFocusKey?: string;
 }
 
 export function TypstEditor({
   value,
   onChange,
-  onSkip,
   inputMode,
   disabled = false,
-  isSubmitting = false
+  isSubmitting = false,
+  autoFocusKey
 }: TypstEditorProps) {
   const editorId = useId();
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useEffect(() => {
+    if (disabled) {
+      return;
+    }
+
+    const textarea = textareaRef.current;
+
+    if (!textarea) {
+      return;
+    }
+
+    const focusId = window.requestAnimationFrame(() => {
+      textarea.focus();
+      const length = textarea.value.length;
+      textarea.setSelectionRange(length, length);
+    });
+
+    return () => {
+      window.cancelAnimationFrame(focusId);
+    };
+  }, [autoFocusKey, disabled]);
 
   return (
     <div className="w-full space-y-2">
@@ -28,9 +51,6 @@ export function TypstEditor({
         <label htmlFor={editorId} className="font-medium text-[var(--text)]">
           Editor
         </label>
-        <div className="flex flex-wrap gap-2 uppercase tracking-[0.16em]">
-          <span>Shift+Enter skip</span>
-        </div>
       </div>
 
       <div className="rounded-[16px] border border-[color:var(--line)] bg-[var(--panel-strong)] px-3 py-1.5 text-center text-[10px] leading-5 text-[var(--muted)]">
@@ -41,17 +61,10 @@ export function TypstEditor({
 
       <textarea
         id={editorId}
+        ref={textareaRef}
         className="min-h-[3.25rem] w-full rounded-[16px] border border-[color:var(--line)] bg-[var(--panel-strong)] p-3 text-center font-[var(--font-mono)] text-base leading-7 text-[var(--text)] outline-none transition placeholder:text-[var(--muted)] focus:border-[color:var(--line-strong)] disabled:cursor-not-allowed disabled:opacity-70"
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        onKeyDown={(event) => {
-          if (!(event.metaKey || event.ctrlKey) || event.key !== "Enter" || !event.shiftKey) {
-            return;
-          }
-
-          event.preventDefault();
-          onSkip();
-        }}
         placeholder="Type the Typst source that recreates the target render..."
         disabled={disabled}
         spellCheck={false}

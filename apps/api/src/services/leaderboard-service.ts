@@ -7,6 +7,7 @@ import type {
   PersonalRunView
 } from "@typ-nique/types";
 import { prisma } from "../lib/prisma.js";
+import { ensureDailyChallengeForDate } from "./challenge-service.js";
 
 const CACHE_TTL_MS = 15_000;
 
@@ -26,15 +27,18 @@ export async function getLeaderboard(scope: LeaderboardScope, limit = 25): Promi
     return cached;
   }
 
-  const { where, windowStart, windowEnd, label } = buildScopeWindow(scope);
-  const sessions = await prisma.gameSession.findMany({
-    where,
-    orderBy: [{ totalScore: "desc" }, { endedAt: "asc" }, { startedAt: "asc" }],
-    take: safeLimit,
-    include: {
-      user: true
-    }
-  });
+  const { where, windowStart, windowEnd, label } = await buildScopeWindow(scope);
+  const sessions =
+    scope === "daily"
+      ? await getDailyBestSessions(safeLimit, where)
+      : await prisma.gameSession.findMany({
+          where,
+          orderBy: [{ totalScore: "desc" }, { endedAt: "asc" }, { startedAt: "asc" }],
+          take: safeLimit,
+          include: {
+            user: true
+          }
+        });
 
   const result: LeaderboardResponse = {
     scope,
@@ -134,10 +138,11 @@ export function describeLeaderboardStrategy() {
   };
 }
 
-function buildScopeWindow(scope: LeaderboardScope) {
+async function buildScopeWindow(scope: LeaderboardScope) {
   const now = new Date();
 
   if (scope === "daily") {
+    const dailyChallenge = await ensureDailyChallengeForDate(now);
     const windowStart = new Date(now);
     windowStart.setHours(0, 0, 0, 0);
     const windowEnd = new Date(windowStart);
@@ -149,10 +154,8 @@ function buildScopeWindow(scope: LeaderboardScope) {
       windowEnd,
       where: {
         status: "COMPLETED",
-        endedAt: {
-          gte: windowStart,
-          lt: windowEnd
-        }
+        mode: "DAILY",
+        dailyChallengeId: dailyChallenge?.id ?? "__missing_daily__"
       } satisfies Prisma.GameSessionWhereInput
     };
   }
@@ -187,6 +190,37 @@ function buildScopeWindow(scope: LeaderboardScope) {
       status: "COMPLETED"
     } satisfies Prisma.GameSessionWhereInput
   };
+}
+
+async function getDailyBestSessions(limit: number, where: Prisma.GameSessionWhereInput) {
+  const candidates = await prisma.gameSession.findMany({
+    where,
+    orderBy: [{ totalScore: "desc" }, { endedAt: "asc" }, { startedAt: "asc" }],
+    take: Math.max(limit * 8, 50),
+    include: {
+      user: true
+    }
+  });
+
+  const bestRuns = [];
+  const seen = new Set<string>();
+
+  for (const session of candidates) {
+    const identity = session.userId ? `user:${session.userId}` : `guest:${session.playerSessionId}`;
+
+    if (seen.has(identity)) {
+      continue;
+    }
+
+    seen.add(identity);
+    bestRuns.push(session);
+
+    if (bestRuns.length >= limit) {
+      break;
+    }
+  }
+
+  return bestRuns;
 }
 
 function mapSessionToLeaderboardEntry(

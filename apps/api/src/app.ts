@@ -1,5 +1,6 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import { authRoutes } from "./routes/auth-routes.js";
 import { challengeRoutes } from "./routes/challenge-routes.js";
 import { gameSessionRoutes } from "./routes/game-session-routes.js";
 import { leaderboardRoutes } from "./routes/leaderboard-routes.js";
@@ -19,9 +20,10 @@ export function buildApp() {
     }
   });
 
-  app.register(cors, { origin: true });
+  app.register(cors, { origin: true, credentials: true });
 
   app.get("/health", async () => ({ ok: true }));
+  app.register(authRoutes);
   app.register(challengeRoutes);
   app.register(gameSessionRoutes);
   app.register(submissionRoutes);

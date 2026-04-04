@@ -1,4 +1,5 @@
 import type {
+  AuthSessionView,
   ChallengeInputMode,
   ChallengePrompt,
   GameSessionResult,
@@ -10,7 +11,10 @@ import type {
   SubmissionOutcome
 } from "@typ-nique/types";
 
-const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+const configuredBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+const browserBaseUrl = configuredBaseUrl.replace("://127.0.0.1", "://localhost");
+const serverBaseUrl = configuredBaseUrl.replace("://localhost", "://127.0.0.1");
+const baseUrl = typeof window === "undefined" ? serverBaseUrl : browserBaseUrl;
 
 async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${baseUrl}${path}`, {
@@ -19,7 +23,8 @@ async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
       "Content-Type": "application/json",
       ...(init?.headers ?? {})
     },
-    cache: init?.cache ?? "no-store"
+    cache: init?.cache ?? "no-store",
+    credentials: init?.credentials ?? "include"
   });
 
   if (!response.ok) {
@@ -62,10 +67,10 @@ export async function getPersonalLeaderboards(runId: string, limit = 5) {
   return fetchJson<{ data: PersonalLeaderboardResponse }>(`/api/v1/leaderboards/personal?${params.toString()}`);
 }
 
-export async function createPracticeSession() {
+export async function createGameSession(mode: "practice" | "daily" = "practice") {
   return fetchJson<{ data: GameSessionState }>("/api/v1/game-sessions", {
     method: "POST",
-    body: JSON.stringify({ mode: "practice" })
+    body: JSON.stringify({ mode })
   });
 }
 
@@ -105,6 +110,7 @@ export async function previewTypstRender(source: string, inputMode: ChallengeInp
     },
     body: JSON.stringify({ source, inputMode }),
     cache: "no-store",
+    credentials: "include",
     signal
   });
 
@@ -115,4 +121,38 @@ export async function previewTypstRender(source: string, inputMode: ChallengeInp
   }
 
   return payload;
+}
+
+export async function getAuthSession() {
+  return fetchJson<{ data: AuthSessionView & { playerSessionId?: string } }>("/api/v1/auth/session");
+}
+
+export async function registerAccount(payload: {
+  username: string;
+  email: string;
+  password: string;
+  displayName?: string;
+}) {
+  return fetchJson<{ data: AuthSessionView & { playerSessionId?: string } }>("/api/v1/auth/register", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function loginAccount(payload: { identifier: string; password: string }) {
+  return fetchJson<{ data: AuthSessionView & { playerSessionId?: string } }>("/api/v1/auth/login", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function logoutAccount() {
+  return fetchJson<{ data: AuthSessionView }>("/api/v1/auth/logout", {
+    method: "POST"
+  });
+}
+
+export async function getAuthenticatedHistory(limit = 5) {
+  const params = new URLSearchParams({ limit: String(limit) });
+  return fetchJson<{ data: PersonalLeaderboardResponse }>(`/api/v1/auth/history?${params.toString()}`);
 }

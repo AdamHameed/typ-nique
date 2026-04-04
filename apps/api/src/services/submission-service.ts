@@ -13,6 +13,10 @@ export async function submitAttempt(input: {
   sessionId: string;
   roundId: string;
   source: string;
+  actor: {
+    userId: string | null;
+    playerSessionId: string | null;
+  };
 }): Promise<SubmissionOutcome> {
   const round = await prisma.gameRound.findUnique({
     where: { id: input.roundId },
@@ -23,8 +27,15 @@ export async function submitAttempt(input: {
     throw new Error("Round not found for session.");
   }
 
+  if (
+    !(input.actor.userId && round.gameSession.userId === input.actor.userId) &&
+    !(input.actor.playerSessionId && round.gameSession.playerSessionId === input.actor.playerSessionId)
+  ) {
+    throw new Error("Round not accessible.");
+  }
+
   if (round.gameSession.status !== "ACTIVE") {
-    const sessionState = await getGameSessionState(input.sessionId);
+    const sessionState = await getGameSessionState(input.sessionId, input.actor);
 
     return {
       verdict: "incorrect",
@@ -109,7 +120,7 @@ export async function submitAttempt(input: {
     });
 
     await ensureSessionProgression(round.gameSessionId);
-    const sessionState = await getGameSessionState(round.gameSessionId);
+    const sessionState = await getGameSessionState(round.gameSessionId, input.actor);
 
     return {
       ...staticResult,
@@ -163,7 +174,7 @@ export async function submitAttempt(input: {
   const refreshedRound = await prisma.gameRound.findUnique({
     where: { id: round.id }
   });
-  const sessionState = await getGameSessionState(round.gameSessionId);
+  const ownedSessionState = await getGameSessionState(round.gameSessionId, input.actor);
 
   return {
     verdict: resolvedSubmission.verdict.toLowerCase() as SubmissionOutcome["verdict"],
@@ -175,7 +186,7 @@ export async function submitAttempt(input: {
     renderFingerprint: resolvedSubmission.renderFingerprint ?? undefined,
     queuedRenderCheck: false,
     scoreAwarded: resolvedSubmission.verdict === "CORRECT" ? refreshedRound?.scoreAwarded ?? undefined : 0,
-    sessionState: sessionState ?? undefined
+    sessionState: ownedSessionState ?? undefined
   };
 }
 

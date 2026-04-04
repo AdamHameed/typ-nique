@@ -9,6 +9,7 @@ Typ-Nique is a Typst typesetting game inspired by TeXnique. Players race to repr
 - PostgreSQL + Prisma
 - Redis + BullMQ
 - Dedicated worker for Typst rendering and answer checking
+- DB-backed cookie authentication with guest-to-account upgrade
 - Docker and Docker Compose
 
 ## Monorepo layout
@@ -36,6 +37,8 @@ docs/           product and engineering docs
 cp .env.example .env
 ```
 
+If you are running locally, keep `NEXT_PUBLIC_API_URL=http://localhost:4000`. The web client will use `localhost` in the browser so auth and guest cookies stay attached correctly, and it will automatically use `127.0.0.1` only for Next.js server-side fetches where macOS `localhost` can be flaky.
+
 2. Install dependencies.
 
 ```bash
@@ -61,13 +64,20 @@ pnpm db:migrate
 pnpm db:seed
 ```
 
-6. Start the apps.
+6. Start the full local stack with one command.
 
 ```bash
 pnpm dev
 ```
 
-Or start the full local stack in one terminal:
+That starts:
+- PostgreSQL
+- Redis
+- API
+- worker
+- web app
+
+You can still use `make` if you prefer:
 
 ```bash
 make dev
@@ -80,6 +90,29 @@ make setup
 make dev-no-seed
 make infra-down
 make infra-reset
+pnpm dev:stack:no-seed
+pnpm dev:stack:reset
+pnpm dev:stop
+pnpm dev:workspace
+```
+
+## Authentication
+
+- Guest mode still works by default through a persistent guest cookie and `PlayerSession`.
+- Registered users authenticate through DB-backed HTTP-only cookie sessions.
+- Signing up or logging in from an existing guest browser upgrades the current guest history into the authenticated account.
+- New auth routes:
+  - `POST /api/v1/auth/register`
+  - `POST /api/v1/auth/login`
+  - `POST /api/v1/auth/logout`
+  - `GET /api/v1/auth/session`
+  - `GET /api/v1/auth/history`
+
+After pulling auth changes, run:
+
+```bash
+pnpm db:generate
+pnpm db:migrate
 ```
 
 ## Docker
@@ -108,7 +141,6 @@ Services:
 
 ## Next implementation steps
 
-- Add real auth
 - Replace in-memory leaderboard reads with persisted score rollups
 - Implement hardened Typst sandbox execution
 - Add canonical SVG artifact storage

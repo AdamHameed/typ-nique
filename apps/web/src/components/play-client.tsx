@@ -6,12 +6,10 @@ import type { GameSessionState, PreviewRenderResponse } from "@typ-nique/types";
 import { Card } from "@typ-nique/ui";
 import { LiveRenderPreview } from "./live-render-preview";
 import { TypstEditor } from "./typst-editor";
-import { createPracticeSession, finishSession, getGameSession, skipRound, submitGameAnswer } from "../lib/api";
+import { createGameSession, finishSession, getGameSession, skipRound, submitGameAnswer } from "../lib/api";
 import { optimizeTypstSvgForSnippet } from "../lib/typst-snippet";
 
-const SESSION_STORAGE_KEY = "typ-nique:session-id";
-
-export function PlayClient() {
+export function PlayClient({ mode = "practice" }: { mode?: "practice" | "daily" }) {
   const router = useRouter();
   const [session, setSession] = useState<GameSessionState | null>(null);
   const [source, setSource] = useState("");
@@ -21,6 +19,8 @@ export function PlayClient() {
   const [isPending, startTransition] = useTransition();
   const pollingRef = useRef<number | null>(null);
   const autoSubmitKeyRef = useRef<string | null>(null);
+  const skipLockRef = useRef<string | null>(null);
+  const bootstrapPromiseRef = useRef<Promise<void> | null>(null);
 
   useEffect(() => {
     void bootstrapSession();
@@ -30,13 +30,13 @@ export function PlayClient() {
         window.clearInterval(pollingRef.current);
       }
     };
-  }, []);
+  }, [mode]);
 
   useEffect(() => {
     if (!session) return;
 
     if (session.status === "completed") {
-      window.localStorage.removeItem(SESSION_STORAGE_KEY);
+      window.localStorage.removeItem(getSessionStorageKey(mode));
       router.push(`/results/${session.id}`);
       return;
     }
@@ -44,7 +44,7 @@ export function PlayClient() {
     if (session.currentRound) {
       setStatus(session.lastResult?.feedback ?? "Type until the preview matches the target.");
     }
-  }, [router, session?.currentRound?.roundId, session?.status]);
+  }, [mode, router, session?.currentRound?.roundId, session?.status]);
 
   useEffect(() => {
     if (!session || session.status !== "active") {
@@ -67,7 +67,13 @@ export function PlayClient() {
   }, [session?.id, session?.status]);
 
   async function bootstrapSession() {
-    const existingId = window.localStorage.getItem(SESSION_STORAGE_KEY);
+    if (bootstrapPromiseRef.current) {
+      await bootstrapPromiseRef.current;
+      return;
+    }
+
+    bootstrapPromiseRef.current = (async () => {
+    const existingId = window.localStorage.getItem(getSessionStorageKey(mode));
 
     if (existingId) {
       const existing = await getGameSession(existingId).catch(() => null);
@@ -78,18 +84,31 @@ export function PlayClient() {
       }
     }
 
-    const created = await createPracticeSession();
-    window.localStorage.setItem(SESSION_STORAGE_KEY, created.data.id);
+    const created = await createGameSession(mode);
+    window.localStorage.setItem(getSessionStorageKey(mode), created.data.id);
     setSession(created.data);
+    })();
+
+    try {
+      await bootstrapPromiseRef.current;
+    } finally {
+      bootstrapPromiseRef.current = null;
+    }
   }
 
   async function refreshSession(sessionId: string, noisy = true) {
     const next = await getGameSession(sessionId).catch(() => null);
 
     if (!next?.data) {
-      if (noisy) {
-        setFatalError("The session could not be refreshed.");
+      if (sessionId === window.localStorage.getItem(getSessionStorageKey(mode))) {
+        window.localStorage.removeItem(getSessionStorageKey(mode));
       }
+
+      if (noisy) {
+        setStatus("That run was no longer available. Starting a fresh session.");
+      }
+
+      await bootstrapSession();
       return;
     }
 
@@ -106,8 +125,6 @@ export function PlayClient() {
       return;
     }
 
-    setStatus("Accepted. Finalizing...");
-
     startTransition(async () => {
       try {
         const response = await submitGameAnswer({
@@ -120,10 +137,10 @@ export function PlayClient() {
           setSession(response.data.sessionState);
         }
 
-        setStatus(response.data.feedback);
-
         if (response.data.verdict === "correct" && !response.data.queuedRenderCheck) {
           clearDraft(session.id, session.currentRound!.roundId);
+        } else {
+          setStatus(response.data.feedback);
         }
 
         if (response.data.queuedRenderCheck) {
@@ -131,7 +148,15 @@ export function PlayClient() {
           await refreshSession(session.id, true);
         }
       } catch (error) {
-        setStatus(error instanceof Error ? error.message : "Submission failed.");
+        const message = error instanceof Error ? error.message : "Submission failed.";
+
+        if (message.includes("not accessible") || message.includes("not found")) {
+          clearDraft(session.id, session.currentRound!.roundId);
+          await refreshSession(session.id, true);
+          return;
+        }
+
+        setStatus(message);
       }
     });
   }
@@ -140,6 +165,14 @@ export function PlayClient() {
     if (!session?.currentRound) {
       return;
     }
+
+    const skipKey = `${session.id}:${session.currentRound.roundId}`;
+
+    if (skipLockRef.current === skipKey || isPending) {
+      return;
+    }
+
+    skipLockRef.current = skipKey;
 
     setStatus("Skipping prompt...");
 
@@ -154,7 +187,16 @@ export function PlayClient() {
         setSession(response.data);
         setStatus("Skipped. Moving to the next challenge.");
       } catch (error) {
-        setStatus(error instanceof Error ? error.message : "Skip failed.");
+        skipLockRef.current = null;
+        const message = error instanceof Error ? error.message : "Skip failed.";
+
+        if (message.includes("not accessible") || message.includes("not found")) {
+          clearDraft(session.id, session.currentRound!.roundId);
+          await refreshSession(session.id, true);
+          return;
+        }
+
+        setStatus(message);
       }
     });
   }
@@ -168,7 +210,7 @@ export function PlayClient() {
       } catch (error) {
         setStatus(error instanceof Error ? error.message : "Finish request failed. Opening results anyway.");
       } finally {
-        window.localStorage.removeItem(SESSION_STORAGE_KEY);
+        window.localStorage.removeItem(getSessionStorageKey(mode));
         router.push(`/results/${session.id}`);
       }
     });
@@ -183,6 +225,7 @@ export function PlayClient() {
     setSource(savedDraft ?? "");
     setLatestPreview(null);
     autoSubmitKeyRef.current = null;
+    skipLockRef.current = null;
   }, [session?.id, session?.currentRound?.roundId]);
 
   useEffect(() => {
@@ -305,10 +348,10 @@ export function PlayClient() {
           <TypstEditor
             value={source}
             onChange={setSource}
-            onSkip={handleSkip}
             inputMode={current?.challenge.inputMode ?? "math"}
             disabled={!current || isPending}
             isSubmitting={isPending}
+            autoFocusKey={current ? `${session?.id ?? "session"}:${current.roundId}` : "inactive"}
           />
           <div className={`rounded-[16px] border px-3 py-2 text-sm leading-6 ${feedbackTone}`}>{status}</div>
           <div className="flex flex-wrap items-center gap-2">
@@ -348,6 +391,10 @@ export function PlayClient() {
 
 function getDraftStorageKey(sessionId: string, roundId: string) {
   return `typ-nique:draft:${sessionId}:${roundId}`;
+}
+
+function getSessionStorageKey(mode: "practice" | "daily") {
+  return `typ-nique:session-id:${mode}`;
 }
 
 function clearDraft(sessionId: string, roundId: string) {

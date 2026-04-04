@@ -31,7 +31,7 @@ export function DailyChallengePanel({
             <div className="flex h-60 items-center justify-center text-[var(--muted)]">No daily render available.</div>
           )}
         </div>
-        <Link href="/play">
+        <Link href="/play?mode=daily">
           <Button className="px-6 py-3 text-base">Play The Daily</Button>
         </Link>
       </Card>

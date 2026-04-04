@@ -17,6 +17,19 @@ export type SessionStatus = "pending" | "active" | "completed" | "abandoned";
 export type ChallengeInputMode = "math" | "text";
 export type LeaderboardScope = "global" | "daily" | "weekly";
 
+export interface AuthUserView {
+  id: string;
+  username: string;
+  email: string | null;
+  displayName: string | null;
+}
+
+export interface AuthSessionView {
+  authenticated: boolean;
+  guest: boolean;
+  user: AuthUserView | null;
+}
+
 export interface ChallengePrompt {
   id: string;
   slug: string;

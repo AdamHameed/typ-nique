@@ -10,8 +10,8 @@ PNPM := pnpm
 help:
 	@printf "\nTyp-Nique dev commands\n\n"
 	@printf "  make setup       Install deps, start postgres/redis, migrate, and seed\n"
-	@printf "  make dev         Start infra, migrate, seed, and run api/worker/web in one terminal\n"
-	@printf "  make dev-no-seed Start infra, generate Prisma, and run api/worker/web without reseeding\n"
+	@printf "  make dev         One-command local startup for web, api, worker, postgres, and redis\n"
+	@printf "  make dev-no-seed Same as dev, but skip reseeding\n"
 	@printf "  make infra-up    Start postgres and redis only\n"
 	@printf "  make infra-down  Stop docker services\n"
 	@printf "  make infra-reset Stop docker services and remove volumes\n"
@@ -41,25 +41,11 @@ db-seed:
 setup: install infra-up db-generate db-migrate db-seed
 
 dev:
-	set -euo pipefail
-	$(MAKE) setup
-	trap 'echo ""; echo "Shutting down Typ-Nique..."; kill 0' EXIT INT TERM
-	$(PNPM) --filter @typ-nique/api dev &
-	$(PNPM) --filter @typ-nique/worker dev &
-	$(PNPM) --filter @typ-nique/web dev &
-	wait
+	$(PNPM) dev:stack
 
 dev-no-seed:
-	set -euo pipefail
-	$(MAKE) install
-	$(MAKE) infra-up
-	$(MAKE) db-generate
-	trap 'echo ""; echo "Shutting down Typ-Nique..."; kill 0' EXIT INT TERM
-	$(PNPM) --filter @typ-nique/api dev &
-	$(PNPM) --filter @typ-nique/worker dev &
-	$(PNPM) --filter @typ-nique/web dev &
-	wait
+	$(PNPM) dev:stack:no-seed
 
 reset:
-	$(MAKE) infra-reset
+	$(PNPM) dev:stop
 	$(MAKE) setup

@@ -27,6 +27,22 @@ export const previewRenderSchema = z.object({
   inputMode: z.enum(["math", "text"]).default("math")
 });
 
+export const authRegisterSchema = z.object({
+  username: z.string().min(3).max(40).regex(/^[a-zA-Z0-9_-]+$/),
+  email: z.string().email().max(255),
+  password: z.string().min(8).max(128),
+  displayName: z.string().min(2).max(80).optional()
+});
+
+export const authLoginSchema = z.object({
+  identifier: z.string().min(3).max(255),
+  password: z.string().min(8).max(128)
+});
+
+export const authHistoryQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(20).default(5)
+});
+
 export const enqueueRenderCheckSchema = z.object({
   submissionId: z.string().uuid(),
   roundId: z.string().uuid(),

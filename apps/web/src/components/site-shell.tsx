@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { PropsWithChildren } from "react";
+import { AuthControls } from "./auth-controls";
 import { ThemeToggle } from "./theme-toggle";
 
 const navItems = [
@@ -29,10 +30,14 @@ export function SiteShell({ children }: PropsWithChildren) {
                 {item.label}
               </Link>
             ))}
+            <AuthControls />
             <ThemeToggle />
           </nav>
           <div className="md:hidden">
-            <ThemeToggle />
+            <div className="flex items-center gap-2">
+              <AuthControls />
+              <ThemeToggle />
+            </div>
           </div>
         </div>
       </header>
