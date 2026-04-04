@@ -9,6 +9,7 @@ interface LiveRenderPreviewProps {
   source: string;
   inputMode: ChallengeInputMode;
   enabled?: boolean;
+  onPreviewResult?: (result: PreviewRenderResponse | null) => void;
 }
 
 type PreviewState =
@@ -35,7 +36,7 @@ type PreviewState =
 
 const PREVIEW_DEBOUNCE_MS = 700;
 
-export function LiveRenderPreview({ source, inputMode, enabled = true }: LiveRenderPreviewProps) {
+export function LiveRenderPreview({ source, inputMode, enabled = true, onPreviewResult }: LiveRenderPreviewProps) {
   const [state, setState] = useState<PreviewState>({
     status: "idle",
     data: null,
@@ -46,6 +47,7 @@ export function LiveRenderPreview({ source, inputMode, enabled = true }: LiveRen
   useEffect(() => {
     if (!enabled) {
       abortRef.current?.abort();
+      onPreviewResult?.(null);
       setState({
         status: "idle",
         data: null,
@@ -58,6 +60,7 @@ export function LiveRenderPreview({ source, inputMode, enabled = true }: LiveRen
 
     if (!trimmed) {
       abortRef.current?.abort();
+      onPreviewResult?.(null);
       setState({
         status: "idle",
         data: null,
@@ -84,6 +87,7 @@ export function LiveRenderPreview({ source, inputMode, enabled = true }: LiveRen
           }
 
           if (!response.ok) {
+            onPreviewResult?.(response);
             setState({
               status: "error",
               data: response,
@@ -92,6 +96,7 @@ export function LiveRenderPreview({ source, inputMode, enabled = true }: LiveRen
             return;
           }
 
+          onPreviewResult?.(response);
           setState({
             status: "success",
             data: response,
@@ -103,6 +108,7 @@ export function LiveRenderPreview({ source, inputMode, enabled = true }: LiveRen
             return;
           }
 
+          onPreviewResult?.(null);
           setState({
             status: "error",
             data: null,
@@ -115,7 +121,7 @@ export function LiveRenderPreview({ source, inputMode, enabled = true }: LiveRen
       window.clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [enabled, inputMode, source]);
+  }, [enabled, inputMode, onPreviewResult, source]);
 
   const optimizedPreviewSvg =
     state.status === "success" && state.data?.svg ? optimizeTypstSvgForSnippet(state.data.svg) : null;

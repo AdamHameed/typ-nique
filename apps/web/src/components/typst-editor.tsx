@@ -6,7 +6,6 @@ import type { ChallengeInputMode } from "@typ-nique/types";
 interface TypstEditorProps {
   value: string;
   onChange: (value: string) => void;
-  onSubmit: () => void;
   onSkip: () => void;
   inputMode: ChallengeInputMode;
   disabled?: boolean;
@@ -16,7 +15,6 @@ interface TypstEditorProps {
 export function TypstEditor({
   value,
   onChange,
-  onSubmit,
   onSkip,
   inputMode,
   disabled = false,
@@ -31,7 +29,6 @@ export function TypstEditor({
           Editor
         </label>
         <div className="flex flex-wrap gap-2 uppercase tracking-[0.16em]">
-          <span>Enter submit</span>
           <span>Shift+Enter skip</span>
         </div>
       </div>
@@ -48,18 +45,12 @@ export function TypstEditor({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         onKeyDown={(event) => {
-          if (!(event.metaKey || event.ctrlKey) || event.key !== "Enter") {
+          if (!(event.metaKey || event.ctrlKey) || event.key !== "Enter" || !event.shiftKey) {
             return;
           }
 
           event.preventDefault();
-
-          if (event.shiftKey) {
-            onSkip();
-            return;
-          }
-
-          onSubmit();
+          onSkip();
         }}
         placeholder="Type the Typst source that recreates the target render..."
         disabled={disabled}

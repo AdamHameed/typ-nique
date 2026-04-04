@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import type { GameSessionState } from "@typ-nique/types";
-import { Button, Card } from "@typ-nique/ui";
+import type { GameSessionState, PreviewRenderResponse } from "@typ-nique/types";
+import { Card } from "@typ-nique/ui";
 import { LiveRenderPreview } from "./live-render-preview";
 import { TypstEditor } from "./typst-editor";
 import { createPracticeSession, finishSession, getGameSession, skipRound, submitGameAnswer } from "../lib/api";
@@ -17,8 +17,10 @@ export function PlayClient() {
   const [source, setSource] = useState("");
   const [status, setStatus] = useState("Preparing a run...");
   const [fatalError, setFatalError] = useState<string | null>(null);
+  const [latestPreview, setLatestPreview] = useState<PreviewRenderResponse | null>(null);
   const [isPending, startTransition] = useTransition();
   const pollingRef = useRef<number | null>(null);
+  const autoSubmitKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     void bootstrapSession();
@@ -40,7 +42,7 @@ export function PlayClient() {
     }
 
     if (session.currentRound) {
-      setStatus(session.lastResult?.feedback ?? "Type the Typst source and submit when ready.");
+      setStatus(session.lastResult?.feedback ?? "Type until the preview matches the target.");
     }
   }, [router, session?.currentRound?.roundId, session?.status]);
 
@@ -104,7 +106,7 @@ export function PlayClient() {
       return;
     }
 
-    setStatus("Running validation pipeline...");
+    setStatus("Accepted. Finalizing...");
 
     startTransition(async () => {
       try {
@@ -179,6 +181,8 @@ export function PlayClient() {
 
     const savedDraft = window.localStorage.getItem(getDraftStorageKey(session.id, session.currentRound.roundId));
     setSource(savedDraft ?? "");
+    setLatestPreview(null);
+    autoSubmitKeyRef.current = null;
   }, [session?.id, session?.currentRound?.roundId]);
 
   useEffect(() => {
@@ -195,6 +199,28 @@ export function PlayClient() {
 
     window.localStorage.setItem(storageKey, source);
   }, [session?.id, session?.currentRound?.roundId, source]);
+
+  useEffect(() => {
+    if (!session?.currentRound || !latestPreview?.ok || !latestPreview.renderHash || isPending) {
+      return;
+    }
+
+    const targetHash = session.currentRound.challenge.renderHash;
+    const trimmedSource = source.trim();
+
+    if (!targetHash || !trimmedSource || latestPreview.renderHash !== targetHash) {
+      return;
+    }
+
+    const autoSubmitKey = `${session.id}:${session.currentRound.roundId}:${trimmedSource}:${latestPreview.renderHash}`;
+
+    if (autoSubmitKeyRef.current === autoSubmitKey) {
+      return;
+    }
+
+    autoSubmitKeyRef.current = autoSubmitKey;
+    handleSubmit();
+  }, [isPending, latestPreview, session?.currentRound?.challenge.renderHash, session?.currentRound?.roundId, session?.id, source]);
 
   const current = session?.currentRound;
   const optimizedTargetSvg = current?.challenge.renderedSvg
@@ -239,6 +265,7 @@ export function PlayClient() {
                 source={source}
                 inputMode={current?.challenge.inputMode ?? "math"}
                 enabled={Boolean(current) && !isPending}
+                onPreviewResult={setLatestPreview}
               />
             </Card>
           </div>
@@ -278,7 +305,6 @@ export function PlayClient() {
           <TypstEditor
             value={source}
             onChange={setSource}
-            onSubmit={handleSubmit}
             onSkip={handleSkip}
             inputMode={current?.challenge.inputMode ?? "math"}
             disabled={!current || isPending}
@@ -286,9 +312,6 @@ export function PlayClient() {
           />
           <div className={`rounded-[16px] border px-3 py-2 text-sm leading-6 ${feedbackTone}`}>{status}</div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button onClick={handleSubmit} disabled={!current || !source.trim() || isPending} className="px-4 py-2 text-sm">
-              Submit
-            </Button>
             <button
               onClick={handleSkip}
               disabled={!current || isPending}

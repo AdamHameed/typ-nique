@@ -338,7 +338,7 @@ function toRoundPayload(
       title: string;
       difficulty: number;
       category: { slug: string };
-      canonicalArtifact: { svgInline: string | null } | null;
+      canonicalArtifact: { svgInline: string | null; normalizedSvgHash: string } | null;
     };
   },
   timeRemainingMs: number
@@ -357,7 +357,8 @@ function toRoundPayload(
       category: round.challenge.category.slug as ChallengeRoundPayload["challenge"]["category"],
       difficulty: difficultyToLabel(round.challenge.difficulty),
       inputMode: round.challenge.category.slug === "text-formatting" ? "text" : "math",
-      renderedSvg: round.challenge.canonicalArtifact?.svgInline ?? ""
+      renderedSvg: round.challenge.canonicalArtifact?.svgInline ?? "",
+      renderHash: round.challenge.canonicalArtifact?.normalizedSvgHash
     }
   };
 }

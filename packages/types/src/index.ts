@@ -41,6 +41,7 @@ export interface ChallengeRoundPayload {
     difficulty: ChallengeDifficulty;
     inputMode: ChallengeInputMode;
     renderedSvg: string;
+    renderHash?: string;
   };
   score: number;
   streak: number;
