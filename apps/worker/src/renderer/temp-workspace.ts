@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -28,4 +28,35 @@ export async function cleanupRenderWorkspace(workspace: RenderWorkspace) {
     recursive: true,
     force: true
   });
+}
+
+export async function cleanupStaleRenderWorkspaces(options: {
+  tempRootDir?: string;
+  maxAgeMs: number;
+}) {
+  const baseDir = options.tempRootDir ?? os.tmpdir();
+  const entries = await readdir(baseDir, { withFileTypes: true }).catch(() => []);
+  const now = Date.now();
+
+  await Promise.all(
+    entries
+      .filter((entry) => entry.isDirectory() && entry.name.startsWith("typ-nique-render-"))
+      .map(async (entry) => {
+        const fullPath = path.join(baseDir, entry.name);
+        const details = await stat(fullPath).catch(() => null);
+
+        if (!details) {
+          return;
+        }
+
+        if (now - details.mtimeMs < options.maxAgeMs) {
+          return;
+        }
+
+        await rm(fullPath, {
+          recursive: true,
+          force: true
+        }).catch(() => undefined);
+      })
+  );
 }

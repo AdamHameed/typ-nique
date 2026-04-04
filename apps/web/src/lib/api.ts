@@ -12,9 +12,8 @@ import type {
 } from "@typ-nique/types";
 
 const configuredBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
-const browserBaseUrl = configuredBaseUrl.replace("://127.0.0.1", "://localhost");
-const serverBaseUrl = configuredBaseUrl.replace("://localhost", "://127.0.0.1");
-const baseUrl = typeof window === "undefined" ? serverBaseUrl : browserBaseUrl;
+const internalBaseUrl = process.env.API_INTERNAL_URL ?? configuredBaseUrl.replace("://localhost", "://127.0.0.1");
+const baseUrl = typeof window === "undefined" ? internalBaseUrl : "";
 
 async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${baseUrl}${path}`, {

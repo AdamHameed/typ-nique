@@ -9,6 +9,7 @@ import { submissionRoutes } from "./routes/submission-routes.js";
 
 export function buildApp() {
   const app = Fastify({
+    bodyLimit: 16 * 1024,
     logger: {
       transport:
         process.env.NODE_ENV === "development"

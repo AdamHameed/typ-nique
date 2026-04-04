@@ -6,14 +6,14 @@ import { compileTypstToSvg } from "../lib/typst-runner.js";
 
 export async function handleRenderCheckJob(payload: unknown) {
   const job = enqueueRenderCheckSchema.parse(payload);
-  const compileResult = await compileTypstToSvg(job.source);
+  const compileResult = await compileTypstToSvg(job.source, `job:${job.submissionId}`);
 
   if (!compileResult.ok) {
     await prisma.submission.update({
       where: { id: job.submissionId },
       data: {
         verdict: "COMPILE_ERROR",
-        feedback: compileResult.error,
+        feedback: "Typst could not compile that submission.",
         compileError: compileResult.error,
         isAccepted: false,
         compileDurationMs: compileResult.durationMs,

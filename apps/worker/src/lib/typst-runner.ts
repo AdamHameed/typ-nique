@@ -22,8 +22,8 @@ export interface TypstCompileFailure {
 
 export type TypstCompileResult = TypstCompileSuccess | TypstCompileFailure;
 
-export async function compileTypstToSvg(source: string): Promise<TypstCompileResult> {
-  const result = await renderSubmission(toRenderableTypstSourceForMode(source, "math"));
+export async function compileTypstToSvg(source: string, requestId?: string): Promise<TypstCompileResult> {
+  const result = await renderSubmission(toRenderableTypstSourceForMode(source, "math"), requestId);
   return mapRenderResult(result);
 }
 

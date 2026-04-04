@@ -5,6 +5,7 @@ import { prisma } from "../lib/prisma.js";
 import { renderQueue } from "../lib/queue.js";
 import { getChallengeById } from "./challenge-service.js";
 import { ensureSessionProgression, getGameSessionState } from "./game-service.js";
+import { scoreSubmission } from "./scoring.js";
 
 const RENDER_WAIT_TIMEOUT_MS = 4500;
 const RENDER_WAIT_INTERVAL_MS = 150;
@@ -211,15 +212,4 @@ async function waitForRenderVerdict(submissionId: string) {
   }
 
   return null;
-}
-
-function scoreSubmission(
-  difficulty: number,
-  presentedAt: Date
-) {
-  const difficultyBase = difficulty <= 1 ? 100 : difficulty === 2 ? 150 : 220;
-  const elapsedSeconds = Math.max(1, (Date.now() - presentedAt.getTime()) / 1000);
-  const speedBonus = Math.max(0.55, Math.min(1.25, 20 / elapsedSeconds));
-
-  return Math.round(difficultyBase * speedBonus);
 }

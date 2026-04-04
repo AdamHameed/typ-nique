@@ -2,20 +2,30 @@ import type { FastifyInstance } from "fastify";
 import type { PreviewRenderResponse } from "@typ-nique/types";
 import { toRenderableTypstSourceForMode } from "@typ-nique/checker";
 import { previewRenderSchema } from "@typ-nique/validation";
+import { env } from "../lib/env.js";
 import { renderSubmission } from "../renderer/service.js";
 
 export async function previewRoutes(app: FastifyInstance) {
   app.post("/internal/render/preview", async (request, reply) => {
+    if (!isAuthorizedInternalRequest(request.headers["x-worker-internal-token"])) {
+      return reply.code(401).send({
+        ok: false,
+        errorCode: "INTERNAL_ERROR",
+        message: "Unauthorized."
+      } satisfies PreviewRenderResponse);
+    }
+
     const body = previewRenderSchema.parse(request.body);
+    const requestId = typeof request.headers["x-request-id"] === "string" ? request.headers["x-request-id"] : crypto.randomUUID();
     const effectiveSource = toRenderableTypstSourceForMode(body.source, body.inputMode);
-    let renderResult = await renderSubmission(effectiveSource);
+    let renderResult = await renderSubmission(effectiveSource, requestId);
     let finalSource = effectiveSource;
 
     if (!renderResult.ok && body.inputMode === "math") {
       const fallbackSource = buildMathPreviewFallback(body.source);
 
       if (fallbackSource && fallbackSource !== effectiveSource) {
-        const fallbackResult = await renderSubmission(fallbackSource);
+        const fallbackResult = await renderSubmission(fallbackSource, requestId);
 
         if (fallbackResult.ok) {
           renderResult = fallbackResult;
@@ -43,11 +53,23 @@ export async function previewRoutes(app: FastifyInstance) {
           durationMs: renderResult.durationMs,
           cached: renderResult.cached,
           errorCode: renderResult.errorCode,
-          message: renderResult.message
+          message: renderResult.safeMessage ?? renderResult.message
         };
 
     return reply.code(renderResult.ok ? 200 : 422).send(payload);
   });
+}
+
+function isAuthorizedInternalRequest(token: string | string[] | undefined) {
+  if (!env.WORKER_INTERNAL_TOKEN) {
+    return true;
+  }
+
+  if (Array.isArray(token)) {
+    return token.includes(env.WORKER_INTERNAL_TOKEN);
+  }
+
+  return token === env.WORKER_INTERNAL_TOKEN;
 }
 
 function buildMathPreviewFallback(source: string) {

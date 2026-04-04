@@ -1,0 +1,26 @@
+[
+  {
+    "name": "accepts bare inline math against wrapped canonical source",
+    "canonicalSource": "$ 2 + 3 = 5 $",
+    "acceptedAlternates": [],
+    "submissionSource": "2 + 3 = 5",
+    "expectedVerdict": "correct",
+    "expectedMatchTier": "normalized"
+  },
+  {
+    "name": "accepts pre-approved alternate source forms",
+    "canonicalSource": "$ 2 + 3 = 5.0 $",
+    "acceptedAlternates": ["$2 + 3 = 5$"],
+    "submissionSource": "$2 + 3 = 5$",
+    "expectedVerdict": "correct",
+    "expectedMatchTier": "alternate"
+  },
+  {
+    "name": "rejects near misses that normalize differently",
+    "canonicalSource": "$ x^2 + y^2 = z^2 $",
+    "acceptedAlternates": [],
+    "submissionSource": "$ x^2 + y^2 = z^3 $",
+    "expectedVerdict": "incorrect",
+    "expectedMatchTier": "none"
+  }
+]

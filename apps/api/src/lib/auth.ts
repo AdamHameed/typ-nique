@@ -259,8 +259,12 @@ function serializeCookie(name: string, value: string, maxAgeMs: number) {
     `Max-Age=${Math.max(0, Math.floor(maxAgeMs / 1000))}`
   ];
 
-  if (env.NODE_ENV === "production") {
+  if (env.AUTH_COOKIE_SECURE) {
     segments.push("Secure");
+  }
+
+  if (env.AUTH_COOKIE_DOMAIN) {
+    segments.push(`Domain=${env.AUTH_COOKIE_DOMAIN}`);
   }
 
   return segments.join("; ");

@@ -16,16 +16,26 @@ export async function runTypstCompile(params: {
   workspace: RenderWorkspace;
   timeoutMs: number;
   maxLogBytes: number;
+  maxMemoryKb: number;
 }): Promise<CompilerProcessResult> {
   const startedAt = Date.now();
 
   return new Promise((resolve, reject) => {
+    const command = [
+      `ulimit -v ${params.maxMemoryKb} >/dev/null 2>&1 || true`,
+      `exec "${params.typstBin}" compile "${params.workspace.inputPath}" "${params.workspace.outputPath}" --format svg`
+    ].join("; ");
+
     const child = spawn(
-      params.typstBin,
-      ["compile", params.workspace.inputPath, params.workspace.outputPath, "--format", "svg"],
+      "bash",
+      ["-lc", command],
       {
         cwd: params.workspace.rootDir,
-        stdio: ["ignore", "pipe", "pipe"]
+        stdio: ["ignore", "pipe", "pipe"],
+        env: {
+          PATH: process.env.PATH,
+          HOME: process.env.HOME
+        }
       }
     );
 

@@ -3,6 +3,8 @@ export type RenderPurpose = "canonical" | "submission";
 export type RenderErrorCode =
   | "SOURCE_TOO_LARGE"
   | "UNSAFE_SOURCE"
+  | "RATE_LIMITED"
+  | "BUSY"
   | "TIMEOUT"
   | "COMPILER_NOT_FOUND"
   | "COMPILE_ERROR"
@@ -36,6 +38,7 @@ export interface RenderFailure {
   ok: false;
   errorCode: RenderErrorCode;
   message: string;
+  safeMessage?: string;
   cached: boolean;
   durationMs: number;
   stdout?: string;

@@ -1,10 +1,12 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import { adminRoutes } from "./routes/admin-routes.js";
 import { previewRoutes } from "./routes/preview-routes.js";
 import { env } from "./lib/env.js";
 import { createQueueWorker } from "./lib/queue.js";
 import { logger } from "./lib/logger.js";
 import { handleRenderCheckJob } from "./jobs/render-check-job.js";
+import { cleanupStaleRenderWorkspaces } from "./renderer/temp-workspace.js";
 
 const worker = createQueueWorker(async (job) => {
   const roundId =
@@ -35,8 +37,14 @@ const app = Fastify({
 
 await app.register(cors, { origin: true });
 await app.register(previewRoutes);
+await app.register(adminRoutes);
 
 app.get("/health", async () => ({ ok: true }));
+
+await cleanupStaleRenderWorkspaces({
+  tempRootDir: env.TYPST_TEMP_ROOT_DIR,
+  maxAgeMs: env.TYPST_WORKSPACE_MAX_AGE_MS
+});
 
 await app.listen({
   host: "0.0.0.0",
