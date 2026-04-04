@@ -7,6 +7,10 @@ function mapDifficulty(value: number): ChallengePrompt["difficulty"] {
   return "hard";
 }
 
+function resolveInputMode(categorySlug: string): ChallengePrompt["inputMode"] {
+  return categorySlug === "text-formatting" ? "text" : "math";
+}
+
 export async function getDailyChallenge(): Promise<ChallengePrompt | null> {
   const dailyChallenge = await prisma.dailyChallenge.findFirst({
     where: { status: "ACTIVE" },
@@ -40,6 +44,7 @@ export async function getDailyChallenge(): Promise<ChallengePrompt | null> {
     title: challenge.title,
     category: challenge.category.slug as ChallengePrompt["category"],
     difficulty: mapDifficulty(challenge.difficulty),
+    inputMode: resolveInputMode(challenge.category.slug),
     canonicalSource: challenge.canonicalSource,
     normalizedCanonicalSource: challenge.normalizedCanonicalSource,
     renderedSvg: challenge.canonicalArtifact.svgInline ?? "",
@@ -67,6 +72,7 @@ export async function getChallengeById(challengeId: string): Promise<ChallengePr
     title: challenge.title,
     category: challenge.category.slug as ChallengePrompt["category"],
     difficulty: mapDifficulty(challenge.difficulty),
+    inputMode: resolveInputMode(challenge.category.slug),
     canonicalSource: challenge.canonicalSource,
     normalizedCanonicalSource: challenge.normalizedCanonicalSource,
     renderedSvg: challenge.canonicalArtifact.svgInline ?? "",

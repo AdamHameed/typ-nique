@@ -1,19 +1,30 @@
 import { LeaderboardTable } from "../../components/leaderboard-table";
 import { PageHeader } from "../../components/page-header";
 import { SiteShell } from "../../components/site-shell";
-import { getDailyLeaderboard } from "../../lib/api";
+import { getLeaderboard, getPersonalLeaderboards } from "../../lib/api";
 
-export default async function LeaderboardPage() {
-  const leaderboard = await getDailyLeaderboard().catch(() => ({ data: [] }));
+export default async function LeaderboardPage({
+  searchParams
+}: {
+  searchParams?: { scope?: string; runId?: string };
+}) {
+  const requestedScope = searchParams?.scope;
+  const activeScope = requestedScope === "global" || requestedScope === "weekly" || requestedScope === "daily" ? requestedScope : "daily";
+  const leaderboard = await getLeaderboard(activeScope, 25).catch(() => null);
+  const personal = searchParams?.runId ? await getPersonalLeaderboards(searchParams.runId, 5).catch(() => null) : null;
 
   return (
     <SiteShell>
       <PageHeader
         eyebrow="Competition"
-        title="Daily leaderboard"
-        description="The scaffold keeps leaderboard reads separate from gameplay writes so this can evolve into daily challenges, ranked modes, and multiplayer-derived score views."
+        title="Leaderboard"
+        description="Global, daily, and weekly boards with personal bests and recent-run history. Practical now, ready to scale later."
       />
-      <LeaderboardTable entries={leaderboard.data} />
+      {leaderboard?.data ? (
+        <LeaderboardTable board={leaderboard.data} personal={personal?.data ?? null} activeScope={activeScope} />
+      ) : (
+        <p className="text-slate-300">Leaderboard data is unavailable right now.</p>
+      )}
     </SiteShell>
   );
 }

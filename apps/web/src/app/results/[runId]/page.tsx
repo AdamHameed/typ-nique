@@ -1,19 +1,16 @@
 import { PageHeader } from "../../../components/page-header";
-import { ResultsOverview } from "../../../components/results-overview";
+import { ResultsPageClient } from "../../../components/results-page-client";
 import { SiteShell } from "../../../components/site-shell";
-import { getSessionResults } from "../../../lib/api";
 
-export default async function ResultsPage({ params }: { params: { runId: string } }) {
-  const result = await getSessionResults(params.runId).catch(() => null);
-
+export default function ResultsPage({ params }: { params: { runId: string } }) {
   return (
     <SiteShell>
       <PageHeader
         eyebrow="Results"
-        title={`Run ${params.runId}`}
-        description="Final score, solved count, accuracy, and the round-by-round record for the session."
+        title="Run Complete"
+        description="Final score, pace, personal context, and the round-by-round record for the session."
       />
-      {result?.data ? <ResultsOverview result={result.data} /> : <p className="text-slate-300">Result not found.</p>}
+      <ResultsPageClient runId={params.runId} />
     </SiteShell>
   );
 }

@@ -1,8 +1,12 @@
 import type {
+  ChallengeInputMode,
   ChallengePrompt,
   GameSessionResult,
   GameSessionState,
+  LeaderboardResponse,
   LeaderboardEntryView,
+  PersonalLeaderboardResponse,
+  PreviewRenderResponse,
   SubmissionOutcome
 } from "@typ-nique/types";
 
@@ -19,7 +23,14 @@ async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
   });
 
   if (!response.ok) {
-    throw new Error(`Request failed for ${path}`);
+    const fallbackMessage = `Request failed for ${path}`;
+
+    try {
+      const payload = (await response.json()) as { error?: string; message?: string };
+      throw new Error(payload.message ?? payload.error ?? fallbackMessage);
+    } catch {
+      throw new Error(fallbackMessage);
+    }
   }
 
   return response.json() as Promise<T>;
@@ -31,6 +42,24 @@ export async function getDailyChallenge() {
 
 export async function getDailyLeaderboard() {
   return fetchJson<{ data: LeaderboardEntryView[] }>("/api/v1/leaderboard/daily");
+}
+
+export async function getLeaderboard(scope: "global" | "daily" | "weekly", limit = 25) {
+  const params = new URLSearchParams({
+    scope,
+    limit: String(limit)
+  });
+
+  return fetchJson<{ data: LeaderboardResponse }>(`/api/v1/leaderboards?${params.toString()}`);
+}
+
+export async function getPersonalLeaderboards(runId: string, limit = 5) {
+  const params = new URLSearchParams({
+    runId,
+    limit: String(limit)
+  });
+
+  return fetchJson<{ data: PersonalLeaderboardResponse }>(`/api/v1/leaderboards/personal?${params.toString()}`);
 }
 
 export async function createPracticeSession() {
@@ -66,4 +95,24 @@ export async function finishSession(sessionId: string) {
 
 export async function getSessionResults(sessionId: string) {
   return fetchJson<{ data: GameSessionResult }>(`/api/v1/game-sessions/${sessionId}/results`);
+}
+
+export async function previewTypstRender(source: string, inputMode: ChallengeInputMode, signal?: AbortSignal) {
+  const response = await fetch(`${baseUrl}/api/v1/render/preview`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ source, inputMode }),
+    cache: "no-store",
+    signal
+  });
+
+  const payload = (await response.json()) as PreviewRenderResponse;
+
+  if (!response.ok && !payload.message) {
+    throw new Error("Preview render failed.");
+  }
+
+  return payload;
 }

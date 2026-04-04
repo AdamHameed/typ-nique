@@ -8,7 +8,7 @@ export interface SourceNormalizationResult {
 }
 
 export function normalizeTypstSource(source: string): SourceNormalizationResult {
-  const normalized = normalizeWhitespacePreservingStrings(source);
+  const normalized = normalizeWhitespacePreservingStrings(toComparableSource(source));
 
   return {
     original: source,
@@ -18,8 +18,40 @@ export function normalizeTypstSource(source: string): SourceNormalizationResult 
   };
 }
 
+export function toComparableSource(source: string) {
+  const trimmed = normalizeLineEndings(source).trim();
+
+  if (isWrappedInlineMath(trimmed)) {
+    return unwrapInlineMath(trimmed);
+  }
+
+  return trimmed;
+}
+
+export function toRenderableTypstSource(source: string) {
+  return toRenderableTypstSourceForMode(source, "math");
+}
+
+export function toRenderableTypstSourceForMode(source: string, inputMode: "math" | "text") {
+  const trimmed = normalizeLineEndings(source).trim();
+
+  if (!trimmed) {
+    return trimmed;
+  }
+
+  if (inputMode !== "math") {
+    return trimmed;
+  }
+
+  if (isWrappedInlineMath(trimmed) || trimmed.startsWith("#")) {
+    return trimmed;
+  }
+
+  return `$ ${trimmed} $`;
+}
+
 function normalizeWhitespacePreservingStrings(source: string) {
-  const input = source.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const input = normalizeLineEndings(source);
   const output: string[] = [];
 
   let inString = false;
@@ -83,6 +115,18 @@ function normalizeWhitespacePreservingStrings(source: string) {
     .map((line) => line.replace(/[ \t]+$/g, ""))
     .join("\n")
     .trim();
+}
+
+function normalizeLineEndings(source: string) {
+  return source.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+}
+
+function isWrappedInlineMath(source: string) {
+  return source.startsWith("$") && source.endsWith("$") && source.length >= 2;
+}
+
+function unwrapInlineMath(source: string) {
+  return source.slice(1, -1).trim();
 }
 
 function shouldEmitSpace(previous: string, next: string) {

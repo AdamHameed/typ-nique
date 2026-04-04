@@ -1,6 +1,6 @@
 import type { ChallengePrompt, SubmissionCheckResult } from "@typ-nique/types";
 import { canonicalizeSvg, compareCanonicalSvg, computeRenderHash } from "./svg-comparison.js";
-import { normalizeTypstSource } from "./source-normalization.js";
+import { normalizeTypstSource, toComparableSource, toRenderableTypstSource, toRenderableTypstSourceForMode } from "./source-normalization.js";
 import { toLegacySubmissionCheckResult, validateAnswer, type AnswerValidationInput, type AnswerValidationResult } from "./pipeline.js";
 
 export type { AnswerValidationInput, AnswerValidationResult } from "./pipeline.js";
@@ -39,4 +39,14 @@ export function normalizeSource(source: string) {
   return normalizeTypstSource(source).normalized;
 }
 
-export { validateAnswer, toLegacySubmissionCheckResult, normalizeTypstSource, canonicalizeSvg, compareCanonicalSvg, computeRenderHash };
+export {
+  validateAnswer,
+  toLegacySubmissionCheckResult,
+  normalizeTypstSource,
+  toComparableSource,
+  toRenderableTypstSource,
+  toRenderableTypstSourceForMode,
+  canonicalizeSvg,
+  compareCanonicalSvg,
+  computeRenderHash
+};

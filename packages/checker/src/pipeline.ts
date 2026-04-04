@@ -37,7 +37,7 @@ export interface AnswerValidationResult {
   debug: AnswerValidationDebug;
 }
 
-const CHECKER_VERSION = "answer-checker-v1";
+const CHECKER_VERSION = "answer-checker-v2";
 
 export function validateAnswer({
   submissionSource,
@@ -64,7 +64,7 @@ export function validateAnswer({
       verdict: "correct",
       matchTier: "exact",
       confidence: 1,
-      explanation: "Accepted because the submitted Typst source exactly matches the canonical challenge source.",
+      explanation: "Accepted because the submission exactly matches the canonical challenge source.",
       normalizedSource: submission.normalized,
       debug: debugBase
     });
@@ -75,8 +75,7 @@ export function validateAnswer({
       verdict: "correct",
       matchTier: "normalized",
       confidence: 0.98,
-      explanation:
-        "Accepted after Typst source normalization. Formatting-only differences were ignored without changing meaning.",
+      explanation: "Accepted after normalization. Optional math delimiters and formatting-only differences were ignored.",
       normalizedSource: submission.normalized,
       debug: debugBase
     });
@@ -101,7 +100,7 @@ export function validateAnswer({
       matchTier: "none",
       confidence: 0,
       explanation:
-        "The answer did not match canonical or alternate source forms, and rendered SVG comparison was not available.",
+        "The answer did not match any accepted source form, and rendered SVG comparison was not available.",
       normalizedSource: submission.normalized,
       debug: debugBase
     });
@@ -136,7 +135,7 @@ export function validateAnswer({
     matchTier: "none",
     confidence: 0,
     explanation:
-      "The answer did not match canonical source, normalized source, approved alternates, or rendered SVG equivalence.",
+      "The answer did not match any accepted source form or rendered SVG equivalence.",
     normalizedSource: submission.normalized,
     renderFingerprint: renderComparison.submissionHash,
     debug: {
@@ -173,6 +172,6 @@ function buildResult(input: {
   return {
     ...input,
     passed: input.verdict === "correct",
-    feedback: input.explanation
+    feedback: input.verdict === "correct" ? "Accepted. Your answer matches the target output." : input.explanation
   };
 }

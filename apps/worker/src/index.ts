@@ -1,3 +1,7 @@
+import Fastify from "fastify";
+import cors from "@fastify/cors";
+import { previewRoutes } from "./routes/preview-routes.js";
+import { env } from "./lib/env.js";
 import { createQueueWorker } from "./lib/queue.js";
 import { logger } from "./lib/logger.js";
 import { handleRenderCheckJob } from "./jobs/render-check-job.js";
@@ -25,4 +29,18 @@ worker.on("failed", (job, error) => {
   logger.error(`Failed ${job?.name ?? "unknown"}: ${error.message}`);
 });
 
-logger.info("Typ-Nique render worker started.");
+const app = Fastify({
+  logger: false
+});
+
+await app.register(cors, { origin: true });
+await app.register(previewRoutes);
+
+app.get("/health", async () => ({ ok: true }));
+
+await app.listen({
+  host: "0.0.0.0",
+  port: env.WORKER_PORT
+});
+
+logger.info(`Typ-Nique render worker started on port ${env.WORKER_PORT}.`);

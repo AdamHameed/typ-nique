@@ -3,6 +3,7 @@ import cors from "@fastify/cors";
 import { challengeRoutes } from "./routes/challenge-routes.js";
 import { gameSessionRoutes } from "./routes/game-session-routes.js";
 import { leaderboardRoutes } from "./routes/leaderboard-routes.js";
+import { renderRoutes } from "./routes/render-routes.js";
 import { submissionRoutes } from "./routes/submission-routes.js";
 
 export function buildApp() {
@@ -24,6 +25,7 @@ export function buildApp() {
   app.register(challengeRoutes);
   app.register(gameSessionRoutes);
   app.register(submissionRoutes);
+  app.register(renderRoutes);
   app.register(leaderboardRoutes);
 
   return app;

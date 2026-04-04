@@ -1,5 +1,4 @@
-import { runStaticCheck } from "@typ-nique/checker";
-import { normalizeSource } from "@typ-nique/typst-utils";
+import { normalizeSource, runStaticCheck } from "@typ-nique/checker";
 import type { SubmissionOutcome } from "@typ-nique/types";
 import { createHash } from "node:crypto";
 import { prisma } from "../lib/prisma.js";
@@ -67,7 +66,7 @@ export async function submitAttempt(input: {
   });
 
   if (staticResult.verdict === "correct") {
-    const scoreAwarded = scoreSubmission(round.challenge.difficulty, staticResult.matchTier, round.presentedAt);
+    const scoreAwarded = scoreSubmission(round.challenge.difficulty, round.presentedAt);
 
     await prisma.gameRound.update({
       where: { id: round.id },
@@ -150,14 +149,20 @@ export async function submitAttempt(input: {
     };
   }
 
-  await prisma.gameRound.update({
-    where: { id: round.id },
-    data: {
-      timeTakenMs: Date.now() - round.presentedAt.getTime()
-    }
-  });
-  await ensureSessionProgression(round.gameSessionId);
+  if (resolvedSubmission.verdict === "CORRECT") {
+    await prisma.gameRound.update({
+      where: { id: round.id },
+      data: {
+        timeTakenMs: Date.now() - round.presentedAt.getTime()
+      }
+    });
 
+    await ensureSessionProgression(round.gameSessionId);
+  }
+
+  const refreshedRound = await prisma.gameRound.findUnique({
+    where: { id: round.id }
+  });
   const sessionState = await getGameSessionState(round.gameSessionId);
 
   return {
@@ -169,7 +174,7 @@ export async function submitAttempt(input: {
     compileError: resolvedSubmission.compileError ?? undefined,
     renderFingerprint: resolvedSubmission.renderFingerprint ?? undefined,
     queuedRenderCheck: false,
-    scoreAwarded: resolvedSubmission.verdict === "CORRECT" ? undefined : 0,
+    scoreAwarded: resolvedSubmission.verdict === "CORRECT" ? refreshedRound?.scoreAwarded ?? undefined : 0,
     sessionState: sessionState ?? undefined
   };
 }
@@ -199,14 +204,11 @@ async function waitForRenderVerdict(submissionId: string) {
 
 function scoreSubmission(
   difficulty: number,
-  matchTier: SubmissionOutcome["matchTier"],
   presentedAt: Date
 ) {
   const difficultyBase = difficulty <= 1 ? 100 : difficulty === 2 ? 150 : 220;
-  const tierMultiplier =
-    matchTier === "exact" ? 1 : matchTier === "normalized" ? 0.92 : matchTier === "alternate" ? 0.88 : 0.82;
   const elapsedSeconds = Math.max(1, (Date.now() - presentedAt.getTime()) / 1000);
   const speedBonus = Math.max(0.55, Math.min(1.25, 20 / elapsedSeconds));
 
-  return Math.round(difficultyBase * tierMultiplier * speedBonus);
+  return Math.round(difficultyBase * speedBonus);
 }

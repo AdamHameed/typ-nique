@@ -1,6 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { compareCanonicalSvg, computeRenderHash, normalizeTypstSource, validateAnswer } from "../src/index.js";
+import {
+  compareCanonicalSvg,
+  computeRenderHash,
+  normalizeTypstSource,
+  toRenderableTypstSource,
+  validateAnswer
+} from "../src/index.js";
 import type { ChallengePrompt } from "@typ-nique/types";
 
 function makePrompt(overrides: Partial<ChallengePrompt> = {}): ChallengePrompt {
@@ -50,6 +56,19 @@ test("validator accepts normalized source match", () => {
 
   assert.equal(result.passed, true);
   assert.equal(result.matchTier, "normalized");
+});
+
+test("validator accepts omitted inline math delimiters", () => {
+  const result = validateAnswer({
+    submissionSource: "2 + 3 = 5",
+    canonicalPrompt: makePrompt({
+      acceptedAlternates: []
+    })
+  });
+
+  assert.equal(result.passed, true);
+  assert.equal(result.matchTier, "normalized");
+  assert.equal(result.feedback, "Accepted. Your answer matches the target output.");
 });
 
 test("validator accepts approved alternate source", () => {
@@ -144,6 +163,12 @@ test("validator explains failures when no tier matches", () => {
 
   assert.equal(result.passed, false);
   assert.equal(result.matchTier, "none");
-  assert.match(result.explanation, /did not match canonical source/i);
+  assert.match(result.explanation, /did not match any accepted source form/i);
   assert.equal(result.confidence, 0);
+});
+
+test("renderable source wraps likely bare math expressions", () => {
+  assert.equal(toRenderableTypstSource("x^2 + y^2 = z^2"), "$ x^2 + y^2 = z^2 $");
+  assert.equal(toRenderableTypstSource("$ x^2 + y^2 = z^2 $"), "$ x^2 + y^2 = z^2 $");
+  assert.equal(toRenderableTypstSource("#strong[Typst]"), "#strong[Typst]");
 });

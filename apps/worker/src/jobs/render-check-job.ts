@@ -1,5 +1,5 @@
-import { compareRenderedOutput } from "@typ-nique/checker";
-import { normalizeSource, normalizeSvgMarkup, svgFingerprint } from "@typ-nique/typst-utils";
+import { compareRenderedOutput, normalizeSource } from "@typ-nique/checker";
+import { normalizeSvgMarkup, svgFingerprint } from "@typ-nique/typst-utils";
 import { prisma } from "@typ-nique/db";
 import { enqueueRenderCheckSchema } from "@typ-nique/validation";
 import { compileTypstToSvg } from "../lib/typst-runner.js";
@@ -24,15 +24,6 @@ export async function handleRenderCheckJob(payload: unknown) {
       }
     });
 
-    await prisma.gameRound.update({
-      where: { id: job.roundId },
-      data: {
-        finalVerdict: "COMPILE_ERROR",
-        finalMatchTier: "NONE",
-        resolvedAt: new Date()
-      }
-    });
-
     return {
       status: "compile_error",
       roundId: job.roundId
@@ -47,6 +38,7 @@ export async function handleRenderCheckJob(payload: unknown) {
       title: "Render job",
       category: "basic-math",
       difficulty: "easy",
+      inputMode: "math",
       canonicalSource: job.canonicalSource,
       normalizedCanonicalSource: normalizeSource(job.canonicalSource),
       renderedSvg: job.canonicalSvg,
@@ -94,34 +86,42 @@ export async function handleRenderCheckJob(payload: unknown) {
     }
   });
 
-  await prisma.gameRound.update({
-    where: { id: job.roundId },
-    data: {
-      bestSubmissionId: comparison.verdict === "correct" ? job.submissionId : undefined,
-      finalVerdict: comparison.verdict === "correct" ? "CORRECT" : "INCORRECT",
-      finalMatchTier: comparison.matchTier.toUpperCase() as
-        | "EXACT"
-        | "NORMALIZED"
-        | "RENDERED"
-        | "ALTERNATE"
-        | "NONE",
-      resolvedAt: new Date()
-    }
-  });
-
   if (comparison.verdict === "correct") {
     const round = await prisma.gameRound.findUniqueOrThrow({
       where: { id: job.roundId },
-      include: { gameSession: true }
+      include: { gameSession: true, challenge: true }
     });
 
-    const points = comparison.matchTier === "rendered" ? 75 : comparison.matchTier === "alternate" ? 80 : 0;
+    await prisma.gameRound.update({
+      where: { id: job.roundId },
+      data: {
+        bestSubmissionId: job.submissionId,
+        finalVerdict: "CORRECT",
+        finalMatchTier: comparison.matchTier.toUpperCase() as
+          | "EXACT"
+          | "NORMALIZED"
+          | "RENDERED"
+          | "ALTERNATE"
+          | "NONE",
+        resolvedAt: new Date()
+      }
+    });
+
+    const points = scoreSubmission(round.challenge.difficulty, round.presentedAt);
 
     await prisma.gameSession.update({
       where: { id: round.gameSessionId },
       data: {
         totalScore: { increment: points },
         promptsCorrect: { increment: 1 }
+      }
+    });
+
+    await prisma.gameRound.update({
+      where: { id: round.id },
+      data: {
+        scoreAwarded: points,
+        timeTakenMs: Date.now() - round.presentedAt.getTime()
       }
     });
 
@@ -145,4 +145,12 @@ export async function handleRenderCheckJob(payload: unknown) {
     roundId: job.roundId,
     matchTier: comparison.matchTier
   };
+}
+
+function scoreSubmission(difficulty: number, presentedAt: Date) {
+  const difficultyBase = difficulty <= 1 ? 100 : difficulty === 2 ? 150 : 220;
+  const elapsedSeconds = Math.max(1, (Date.now() - presentedAt.getTime()) / 1000);
+  const speedBonus = Math.max(0.55, Math.min(1.25, 20 / elapsedSeconds));
+
+  return Math.round(difficultyBase * speedBonus);
 }

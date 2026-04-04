@@ -108,12 +108,18 @@ importers:
 
   apps/worker:
     dependencies:
+      '@fastify/cors':
+        specifier: ^10.0.1
+        version: 10.1.0
       '@typ-nique/checker':
         specifier: workspace:*
         version: link:../../packages/checker
       '@typ-nique/db':
         specifier: workspace:*
         version: link:../../prisma
+      '@typ-nique/types':
+        specifier: workspace:*
+        version: link:../../packages/types
       '@typ-nique/typst-utils':
         specifier: workspace:*
         version: link:../../packages/typst-utils
@@ -126,6 +132,9 @@ importers:
       dotenv:
         specifier: ^16.4.7
         version: 16.6.1
+      fastify:
+        specifier: ^5.2.1
+        version: 5.8.4
       ioredis:
         specifier: ^5.4.2
         version: 5.10.1

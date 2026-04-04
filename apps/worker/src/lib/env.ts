@@ -3,6 +3,7 @@ import { z } from "zod";
 
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+  WORKER_PORT: z.coerce.number().default(4100),
   REDIS_URL: z.string().min(1),
   QUEUE_NAME: z.string().default("render-jobs"),
   TYPST_BIN: z.string().default("typst"),

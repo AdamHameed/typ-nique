@@ -356,6 +356,7 @@ function toRoundPayload(
       title: round.challenge.title,
       category: round.challenge.category.slug as ChallengeRoundPayload["challenge"]["category"],
       difficulty: difficultyToLabel(round.challenge.difficulty),
+      inputMode: round.challenge.category.slug === "text-formatting" ? "text" : "math",
       renderedSvg: round.challenge.canonicalArtifact?.svgInline ?? ""
     }
   };

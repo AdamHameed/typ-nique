@@ -1,3 +1,4 @@
+import { toRenderableTypstSourceForMode } from "@typ-nique/checker";
 import { renderCanonicalChallenge, renderSubmission } from "../renderer/service.js";
 import type { RenderFailure, RenderSuccess } from "../renderer/types.js";
 
@@ -22,12 +23,12 @@ export interface TypstCompileFailure {
 export type TypstCompileResult = TypstCompileSuccess | TypstCompileFailure;
 
 export async function compileTypstToSvg(source: string): Promise<TypstCompileResult> {
-  const result = await renderSubmission(source);
+  const result = await renderSubmission(toRenderableTypstSourceForMode(source, "math"));
   return mapRenderResult(result);
 }
 
 export async function compileCanonicalTypstToSvg(source: string): Promise<TypstCompileResult> {
-  const result = await renderCanonicalChallenge(source);
+  const result = await renderCanonicalChallenge(toRenderableTypstSourceForMode(source, "math"));
   return mapRenderResult(result);
 }
 

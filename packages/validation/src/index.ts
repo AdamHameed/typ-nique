@@ -22,6 +22,11 @@ export const skipRoundSchema = z.object({
   roundId: z.string().uuid()
 });
 
+export const previewRenderSchema = z.object({
+  source: z.string().min(1).max(12000),
+  inputMode: z.enum(["math", "text"]).default("math")
+});
+
 export const enqueueRenderCheckSchema = z.object({
   submissionId: z.string().uuid(),
   roundId: z.string().uuid(),

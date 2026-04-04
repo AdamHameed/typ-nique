@@ -6,10 +6,10 @@ interface PageHeaderProps {
 
 export function PageHeader({ eyebrow, title, description }: PageHeaderProps) {
   return (
-    <div className="mb-8 space-y-3">
-      <p className="text-sm uppercase tracking-[0.25em] text-cyan-300">{eyebrow}</p>
-      <h1 className="text-4xl font-semibold tracking-tight text-white">{title}</h1>
-      <p className="max-w-2xl text-base leading-7 text-slate-300">{description}</p>
+    <div className="mb-8 space-y-3 sm:mb-10">
+      <p className="text-xs uppercase tracking-[0.28em] text-cyan-300">{eyebrow}</p>
+      <h1 className="max-w-4xl text-4xl font-semibold tracking-tight text-white sm:text-5xl">{title}</h1>
+      <p className="max-w-3xl text-base leading-7 text-slate-300 sm:text-lg">{description}</p>
     </div>
   );
 }

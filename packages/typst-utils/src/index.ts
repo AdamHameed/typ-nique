@@ -1,12 +1,18 @@
 import { createHash } from "node:crypto";
 
 export function normalizeSource(source: string): string {
-  return source
+  const trimmed = source
     .replace(/\r\n/g, "\n")
     .split("\n")
     .map((line) => line.replace(/[ \t]+$/g, "").replace(/[ \t]{2,}/g, " ").trim())
     .join("\n")
     .trim();
+
+  if (trimmed.startsWith("$") && trimmed.endsWith("$") && trimmed.length >= 2) {
+    return trimmed.slice(1, -1).trim();
+  }
+
+  return trimmed;
 }
 
 export function normalizeSvgMarkup(svg: string): string {

@@ -14,6 +14,8 @@ export type ChallengeContentStatus = "active" | "inactive";
 export type MatchTier = "exact" | "normalized" | "rendered" | "alternate" | "none";
 export type SubmissionVerdict = "correct" | "incorrect" | "compile_error";
 export type SessionStatus = "pending" | "active" | "completed" | "abandoned";
+export type ChallengeInputMode = "math" | "text";
+export type LeaderboardScope = "global" | "daily" | "weekly";
 
 export interface ChallengePrompt {
   id: string;
@@ -21,6 +23,7 @@ export interface ChallengePrompt {
   title: string;
   category: ChallengeCategory;
   difficulty: ChallengeDifficulty;
+  inputMode: ChallengeInputMode;
   canonicalSource: string;
   normalizedCanonicalSource: string;
   renderedSvg?: string;
@@ -36,6 +39,7 @@ export interface ChallengeRoundPayload {
     title: string;
     category: ChallengeCategory;
     difficulty: ChallengeDifficulty;
+    inputMode: ChallengeInputMode;
     renderedSvg: string;
   };
   score: number;
@@ -54,10 +58,39 @@ export interface SubmissionCheckResult {
 }
 
 export interface LeaderboardEntryView {
+  rank: number;
+  runId: string;
   userName: string;
   score: number;
   accuracy: number;
+  solvedCount?: number;
+  isGuest?: boolean;
+  mode?: "practice" | "daily";
   createdAt: string;
+}
+
+export interface PersonalRunView {
+  runId: string;
+  label: string;
+  score: number;
+  accuracy: number;
+  solvedCount: number;
+  endedAt: string;
+}
+
+export interface LeaderboardResponse {
+  scope: LeaderboardScope;
+  label: string;
+  windowStart?: string;
+  windowEnd?: string;
+  entries: LeaderboardEntryView[];
+}
+
+export interface PersonalLeaderboardResponse {
+  runId: string;
+  bestScores: PersonalRunView[];
+  recentRuns: PersonalRunView[];
+  guestMode: boolean;
 }
 
 export interface RoundBreakdown {
@@ -123,6 +156,19 @@ export interface SubmissionOutcome {
   queuedRenderCheck?: boolean;
   scoreAwarded?: number;
   sessionState?: GameSessionState;
+}
+
+export interface PreviewRenderResponse {
+  ok: boolean;
+  svg?: string;
+  renderHash?: string;
+  effectiveSource?: string;
+  autoWrappedMath?: boolean;
+  inputMode?: ChallengeInputMode;
+  durationMs?: number;
+  cached?: boolean;
+  errorCode?: string;
+  message?: string;
 }
 
 export interface ChallengeContentEntry {
