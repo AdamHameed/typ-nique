@@ -17,9 +17,9 @@ export function ResultsOverview({
       <div className="grid gap-6 xl:grid-cols-[0.88fr,1.12fr]">
         <Card className="space-y-6">
           <div className="space-y-3">
-            <p className="text-xs uppercase tracking-[0.26em] text-cyan-300">Run Summary</p>
-            <p className="text-6xl font-semibold tracking-tight text-white">{result.score}</p>
-            <p className="max-w-md text-base leading-7 text-slate-300">
+            <p className="text-xs uppercase tracking-[0.26em] text-[var(--muted)]">Run Summary</p>
+            <p className="text-6xl font-semibold tracking-tight text-[var(--text)]">{result.score}</p>
+            <p className="max-w-md text-base leading-7 text-[var(--muted)]">
               {result.solvedCount} solved, {result.attemptedCount} attempted, and {solvedRate}% accuracy across the full session.
             </p>
           </div>
@@ -31,10 +31,10 @@ export function ResultsOverview({
             <ResultStat label="Window" value={`${Math.round(result.durationMs / 60000)} min`} />
           </div>
 
-          <div className="rounded-[24px] border border-white/8 bg-white/5 p-4">
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Best Round</p>
-            <p className="mt-2 text-lg font-semibold text-white">{topRound?.challengeTitle ?? "No completed rounds yet"}</p>
-            <p className="mt-1 text-sm text-slate-400">
+          <div className="rounded-[24px] border border-[color:var(--line)] bg-[var(--panel-strong)] p-4">
+            <p className="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Best Round</p>
+            <p className="mt-2 text-lg font-semibold text-[var(--text)]">{topRound?.challengeTitle ?? "No completed rounds yet"}</p>
+            <p className="mt-1 text-sm text-[var(--muted)]">
               {topRound ? `${topRound.scoreAwarded} points • ${topRound.verdict} via ${topRound.matchTier}` : "Finish a run to surface standout prompts here."}
             </p>
           </div>
@@ -45,7 +45,7 @@ export function ResultsOverview({
             </Link>
             <Link
               href={`/leaderboard?scope=daily&runId=${result.id}`}
-              className="inline-flex items-center justify-center rounded-full border border-white/10 bg-white/5 px-6 py-3 text-sm font-medium text-white transition hover:bg-white/10"
+              className="inline-flex items-center justify-center rounded-full border border-[color:var(--line)] bg-[var(--panel-strong)] px-6 py-3 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--panel)]"
             >
               View Leaderboards
             </Link>
@@ -55,28 +55,28 @@ export function ResultsOverview({
         <Card>
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-semibold text-white">Per-problem breakdown</h2>
-              <p className="mt-1 text-sm text-slate-400">Every round, verdict, and score swing from the session.</p>
+              <h2 className="text-2xl font-semibold text-[var(--text)]">Per-problem breakdown</h2>
+              <p className="mt-1 text-sm text-[var(--muted)]">Every round, verdict, and score swing from the session.</p>
             </div>
           </div>
 
           <div className="mt-5 space-y-3">
             {result.rounds.map((round) => (
-              <div key={round.roundId} className="rounded-[24px] border border-white/8 bg-white/5 px-4 py-4">
+              <div key={round.roundId} className="rounded-[24px] border border-[color:var(--line)] bg-[var(--panel-strong)] px-4 py-4">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
-                    <p className="font-medium text-white">{round.position}. {round.challengeTitle}</p>
-                    <p className="mt-1 text-sm text-slate-400">
+                    <p className="font-medium text-[var(--text)]">{round.position}. {round.challengeTitle}</p>
+                    <p className="mt-1 text-sm text-[var(--muted)]">
                       {round.verdict} via {round.matchTier} • {round.difficulty}
                     </p>
                   </div>
-                  <div className="rounded-full bg-cyan-300/10 px-3 py-1 text-sm font-medium text-cyan-200">
+                  <div className="rounded-full border border-[color:var(--line)] bg-[var(--panel)] px-3 py-1 text-sm font-medium text-[var(--text)]">
                     +{round.scoreAwarded}
                   </div>
                 </div>
-                {round.feedback ? <p className="mt-3 text-sm leading-6 text-slate-300">{round.feedback}</p> : null}
+                {round.feedback ? <p className="mt-3 text-sm leading-6 text-[var(--muted)]">{round.feedback}</p> : null}
                 {round.submittedSource ? (
-                  <div className="mt-3 rounded-2xl border border-white/8 bg-slate-950/70 p-3 font-[var(--font-mono)] text-xs text-slate-300">
+                  <div className="mt-3 rounded-2xl border border-[color:var(--line)] bg-[var(--panel)] p-3 font-[var(--font-mono)] text-xs text-[var(--text)]">
                     {round.submittedSource}
                   </div>
                 ) : null}
@@ -124,13 +124,13 @@ function RunsPanel({
   return (
     <Card>
       <div>
-        <h2 className="text-2xl font-semibold text-white">{title}</h2>
-        <p className="mt-1 text-sm text-slate-400">{description}</p>
+        <h2 className="text-2xl font-semibold text-[var(--text)]">{title}</h2>
+        <p className="mt-1 text-sm text-[var(--muted)]">{description}</p>
       </div>
 
       <div className="mt-5 space-y-3">
         {runs.length === 0 ? (
-          <div className="rounded-[24px] border border-dashed border-white/10 px-4 py-6 text-sm text-slate-500">
+          <div className="rounded-[24px] border border-dashed border-[color:var(--line)] px-4 py-6 text-sm text-[var(--muted)]">
             {emptyLabel}
           </div>
         ) : (
@@ -138,18 +138,18 @@ function RunsPanel({
             <Link
               key={run.runId}
               href={`/results/${run.runId}`}
-              className="block rounded-[24px] border border-white/8 bg-white/5 px-4 py-4 transition hover:bg-white/8"
+              className="block rounded-[24px] border border-[color:var(--line)] bg-[var(--panel-strong)] px-4 py-4 transition hover:bg-[var(--panel)]"
             >
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <p className="font-medium text-white">{run.label}</p>
-                  <p className="mt-1 text-sm text-slate-400">
+                  <p className="font-medium text-[var(--text)]">{run.label}</p>
+                  <p className="mt-1 text-sm text-[var(--muted)]">
                     {run.solvedCount} solved • {Math.round(run.accuracy * 100)}% accuracy
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-lg font-semibold text-cyan-200">{run.score}</p>
-                  <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Score</p>
+                  <p className="text-lg font-semibold text-[var(--text)]">{run.score}</p>
+                  <p className="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Score</p>
                 </div>
               </div>
             </Link>
@@ -162,9 +162,9 @@ function RunsPanel({
 
 function ResultStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[22px] border border-white/8 bg-white/5 px-4 py-4">
-      <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{label}</p>
-      <p className="mt-2 text-2xl font-semibold text-white">{value}</p>
+    <div className="rounded-[22px] border border-[color:var(--line)] bg-[var(--panel-strong)] px-4 py-4">
+      <p className="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">{label}</p>
+      <p className="mt-2 text-2xl font-semibold text-[var(--text)]">{value}</p>
     </div>
   );
 }

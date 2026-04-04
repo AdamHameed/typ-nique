@@ -23,7 +23,7 @@ export default async function LeaderboardPage({
       {leaderboard?.data ? (
         <LeaderboardTable board={leaderboard.data} personal={personal?.data ?? null} activeScope={activeScope} />
       ) : (
-        <p className="text-slate-300">Leaderboard data is unavailable right now.</p>
+        <p className="text-[var(--muted)]">Leaderboard data is unavailable right now.</p>
       )}
     </SiteShell>
   );

@@ -212,7 +212,7 @@ export function PlayClient() {
           normalizedStatus.includes("unavailable") ||
           normalizedStatus.includes("compile")
         ? "border-rose-400/20 bg-rose-400/10 text-rose-100"
-      : "border-white/8 bg-white/5 text-slate-300";
+        : "border-[color:var(--line)] bg-[var(--panel-strong)] text-[var(--muted)]";
 
   return (
     <div className="space-y-2.5">

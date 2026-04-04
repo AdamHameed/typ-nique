@@ -20,8 +20,8 @@ export function LeaderboardTable({
             href={`/leaderboard?scope=${scope}`}
             className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
               scope === activeScope
-                ? "border-cyan-300/20 bg-cyan-300/10 text-cyan-100"
-                : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"
+                ? "border-[color:var(--line-strong)] bg-[var(--panel-strong)] text-[var(--text)]"
+                : "border-[color:var(--line)] bg-[var(--panel)] text-[var(--muted)] hover:bg-[var(--panel-strong)]"
             }`}
           >
             {scope[0]!.toUpperCase() + scope.slice(1)}
@@ -33,19 +33,19 @@ export function LeaderboardTable({
         <Card>
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-semibold text-white">{board.label}</h2>
-              <p className="mt-1 text-sm text-slate-400">
+              <h2 className="text-2xl font-semibold text-[var(--text)]">{board.label}</h2>
+              <p className="mt-1 text-sm text-[var(--muted)]">
                 Ranked by score, then earlier finish time. Guests are shown with anonymized labels.
               </p>
             </div>
-            <div className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs uppercase tracking-[0.22em] text-cyan-200">
+            <div className="rounded-full border border-[color:var(--line)] bg-[var(--panel-strong)] px-3 py-1 text-xs uppercase tracking-[0.22em] text-[var(--muted)]">
               {board.scope}
             </div>
           </div>
 
-          <div className="mt-6 overflow-hidden rounded-[26px] border border-white/10">
-            <table className="min-w-full divide-y divide-white/10 text-left text-sm">
-              <thead className="bg-white/6 text-slate-400">
+          <div className="mt-6 overflow-hidden rounded-[26px] border border-[color:var(--line)]">
+            <table className="min-w-full divide-y divide-[color:var(--line)] text-left text-sm">
+              <thead className="bg-[var(--panel-strong)] text-[var(--muted)]">
                 <tr>
                   <th className="px-5 py-4">Rank</th>
                   <th className="px-5 py-4">Player</th>
@@ -55,23 +55,23 @@ export function LeaderboardTable({
                   <th className="px-5 py-4">Finished</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/8 bg-[rgba(255,255,255,0.02)]">
+              <tbody className="divide-y divide-[color:var(--line)] bg-[var(--panel)]">
                 {board.entries.map((entry) => (
-                  <tr key={entry.runId} className="transition hover:bg-white/5">
-                    <td className="px-5 py-4 text-slate-500">{entry.rank}</td>
+                  <tr key={entry.runId} className="transition hover:bg-[var(--panel-strong)]">
+                    <td className="px-5 py-4 text-[var(--muted)]">{entry.rank}</td>
                     <td className="px-5 py-4">
-                      <div className="font-medium text-white">{entry.userName}</div>
-                      <div className="text-xs text-slate-500">{entry.isGuest ? "Guest run" : "Registered player"}</div>
+                      <div className="font-medium text-[var(--text)]">{entry.userName}</div>
+                      <div className="text-xs text-[var(--muted)]">{entry.isGuest ? "Guest run" : "Registered player"}</div>
                     </td>
-                    <td className="px-5 py-4 text-cyan-200">{entry.score}</td>
+                    <td className="px-5 py-4 text-[var(--text)]">{entry.score}</td>
                     <td className="px-5 py-4">{Math.round(entry.accuracy * 100)}%</td>
                     <td className="px-5 py-4">{entry.solvedCount ?? 0}</td>
-                    <td className="px-5 py-4 text-slate-500">{entry.createdAt}</td>
+                    <td className="px-5 py-4 text-[var(--muted)]">{entry.createdAt}</td>
                   </tr>
                 ))}
                 {board.entries.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-5 py-10 text-center text-slate-500">
+                    <td colSpan={6} className="px-5 py-10 text-center text-[var(--muted)]">
                       No completed runs have landed on this board yet.
                     </td>
                   </tr>
@@ -120,13 +120,13 @@ function LeaderboardRunsCard({
   return (
     <Card>
       <div>
-        <h2 className="text-2xl font-semibold text-white">{title}</h2>
-        <p className="mt-1 text-sm text-slate-400">{description}</p>
+        <h2 className="text-2xl font-semibold text-[var(--text)]">{title}</h2>
+        <p className="mt-1 text-sm text-[var(--muted)]">{description}</p>
       </div>
 
       <div className="mt-5 space-y-3">
         {runs.length === 0 ? (
-          <div className="rounded-[24px] border border-dashed border-white/10 px-4 py-6 text-sm text-slate-500">
+          <div className="rounded-[24px] border border-dashed border-[color:var(--line)] px-4 py-6 text-sm text-[var(--muted)]">
             {emptyLabel}
           </div>
         ) : (
@@ -134,18 +134,18 @@ function LeaderboardRunsCard({
             <Link
               key={run.runId}
               href={`/results/${run.runId}`}
-              className="block rounded-[24px] border border-white/8 bg-white/5 px-4 py-4 transition hover:bg-white/8"
+              className="block rounded-[24px] border border-[color:var(--line)] bg-[var(--panel-strong)] px-4 py-4 transition hover:bg-[var(--panel)]"
             >
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <p className="font-medium text-white">{run.label}</p>
-                  <p className="mt-1 text-sm text-slate-400">
+                  <p className="font-medium text-[var(--text)]">{run.label}</p>
+                  <p className="mt-1 text-sm text-[var(--muted)]">
                     {run.solvedCount} solved • {Math.round(run.accuracy * 100)}% accuracy
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-lg font-semibold text-cyan-200">{run.score}</p>
-                  <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Score</p>
+                  <p className="text-lg font-semibold text-[var(--text)]">{run.score}</p>
+                  <p className="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Score</p>
                 </div>
               </div>
             </Link>
