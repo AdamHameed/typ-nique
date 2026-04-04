@@ -25,24 +25,18 @@ export function TypstEditor({
   const editorId = useId();
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-400">
-        <label htmlFor={editorId} className="font-medium text-white">
-          Typst Editor
+    <div className="w-full space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-[var(--muted)]">
+        <label htmlFor={editorId} className="font-medium text-[var(--text)]">
+          Editor
         </label>
-        <div className="flex flex-wrap gap-3 text-xs uppercase tracking-[0.18em] text-slate-500">
-          <span>Cmd/Ctrl + Enter submit</span>
-          <span>Cmd/Ctrl + Shift + Enter skip</span>
+        <div className="flex flex-wrap gap-2 uppercase tracking-[0.16em]">
+          <span>Enter submit</span>
+          <span>Shift+Enter skip</span>
         </div>
       </div>
 
-      <div
-        className={`rounded-[20px] border px-4 py-3 text-xs leading-6 ${
-          inputMode === "math"
-            ? "border-cyan-300/12 bg-cyan-300/8 text-cyan-100"
-            : "border-violet-300/12 bg-violet-300/8 text-violet-100"
-        }`}
-      >
+      <div className="rounded-[16px] border border-[color:var(--line)] bg-[var(--panel-strong)] px-3 py-1.5 text-center text-[10px] leading-5 text-[var(--muted)]">
         {inputMode === "math"
           ? "Math mode is on for this prompt: you can type x^2 + y^2 = z^2 without wrapping it in $...$."
           : "Text mode is on for this prompt: write normal Typst text/markup directly. Math delimiters are not needed by default here."}
@@ -50,7 +44,7 @@ export function TypstEditor({
 
       <textarea
         id={editorId}
-        className="min-h-[25rem] w-full rounded-[26px] border border-white/8 bg-slate-950/85 p-5 font-[var(--font-mono)] text-sm leading-7 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-300/50 disabled:cursor-not-allowed disabled:opacity-70"
+        className="min-h-[3.25rem] w-full rounded-[16px] border border-[color:var(--line)] bg-[var(--panel-strong)] p-3 text-center font-[var(--font-mono)] text-base leading-7 text-[var(--text)] outline-none transition placeholder:text-[var(--muted)] focus:border-[color:var(--line-strong)] disabled:cursor-not-allowed disabled:opacity-70"
         value={value}
         onChange={(event) => onChange(event.target.value)}
         onKeyDown={(event) => {
@@ -75,7 +69,7 @@ export function TypstEditor({
         autoComplete="off"
       />
 
-      <div className="flex items-center justify-between text-xs text-slate-500">
+      <div className="flex items-center justify-between text-[10px] text-[var(--muted)]">
         <span>{value.length} characters</span>
         <span>{isSubmitting ? "Submitting..." : "Draft autosaves while this round is active."}</span>
       </div>

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChallengeInputMode, PreviewRenderResponse } from "@typ-nique/types";
 import { previewTypstRender } from "../lib/api";
+import { optimizeTypstSvgForSnippet } from "../lib/typst-snippet";
 
 interface LiveRenderPreviewProps {
   source: string;
@@ -38,7 +39,7 @@ export function LiveRenderPreview({ source, inputMode, enabled = true }: LiveRen
   const [state, setState] = useState<PreviewState>({
     status: "idle",
     data: null,
-    message: "Preview updates after a short pause so typing stays fast."
+    message: "Your draft render will appear here once you start typing."
   });
   const abortRef = useRef<AbortController | null>(null);
 
@@ -94,11 +95,7 @@ export function LiveRenderPreview({ source, inputMode, enabled = true }: LiveRen
           setState({
             status: "success",
             data: response,
-            message: response.autoWrappedMath
-              ? "Preview is up to date. Bare math input was wrapped automatically for game-mode rendering."
-              : response.cached
-                ? "Showing a cached preview."
-                : "Preview is up to date."
+            message: ""
           });
         })
         .catch((error) => {
@@ -120,39 +117,27 @@ export function LiveRenderPreview({ source, inputMode, enabled = true }: LiveRen
     };
   }, [enabled, inputMode, source]);
 
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-medium text-white">Live Preview</p>
-        <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Debounced render</p>
-      </div>
+  const optimizedPreviewSvg =
+    state.status === "success" && state.data?.svg ? optimizeTypstSvgForSnippet(state.data.svg) : null;
 
-      <div className="min-h-[200px] rounded-[24px] border border-white/8 bg-slate-950/70 p-4">
-        {state.status === "success" && state.data?.svg ? (
-          <div className="overflow-auto rounded-2xl bg-white p-4 shadow-inner" dangerouslySetInnerHTML={{ __html: state.data.svg }} />
+  return (
+    <div className="flex h-full flex-col gap-2">
+      <div className="typst-snippet-frame">
+        {optimizedPreviewSvg ? (
+          <div
+            className="typst-snippet"
+            dangerouslySetInnerHTML={{ __html: optimizedPreviewSvg }}
+          />
         ) : (
-          <div className="flex min-h-[168px] items-center justify-center rounded-2xl border border-dashed border-white/10 px-6 text-center text-sm leading-6 text-slate-400">
+          <div className="flex min-h-[96px] items-center justify-center rounded-[12px] border border-dashed border-[color:var(--line)] px-4 text-center text-sm leading-6 text-[var(--muted)]">
             {state.message}
           </div>
         )}
       </div>
 
-      <div
-        className={`rounded-[22px] border px-4 py-3 text-sm leading-6 ${
-          state.status === "error"
-            ? "border-rose-400/20 bg-rose-400/10 text-rose-100"
-            : state.status === "loading"
-              ? "border-amber-300/20 bg-amber-300/10 text-amber-100"
-              : "border-white/8 bg-white/5 text-slate-300"
-        }`}
-      >
-        {state.message}
-        {state.data?.durationMs ? ` (${state.data.durationMs} ms)` : ""}
-      </div>
-
-      {inputMode === "math" && state.data?.autoWrappedMath && state.data.effectiveSource ? (
-        <div className="rounded-[22px] border border-cyan-300/12 bg-cyan-300/8 px-4 py-3 text-xs leading-6 text-cyan-100">
-          Rendering this draft as <span className="font-[var(--font-mono)]">{state.data.effectiveSource}</span>
+      {state.status === "error" ? (
+        <div className="rounded-[14px] border border-[color:var(--line)] bg-[var(--panel-strong)] px-3 py-2 text-xs leading-5 text-[var(--text)]">
+          {state.message}
         </div>
       ) : null}
     </div>

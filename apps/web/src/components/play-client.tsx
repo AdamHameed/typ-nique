@@ -7,6 +7,7 @@ import { Button, Card } from "@typ-nique/ui";
 import { LiveRenderPreview } from "./live-render-preview";
 import { TypstEditor } from "./typst-editor";
 import { createPracticeSession, finishSession, getGameSession, skipRound, submitGameAnswer } from "../lib/api";
+import { optimizeTypstSvgForSnippet } from "../lib/typst-snippet";
 
 const SESSION_STORAGE_KEY = "typ-nique:session-id";
 
@@ -196,6 +197,9 @@ export function PlayClient() {
   }, [session?.id, session?.currentRound?.roundId, source]);
 
   const current = session?.currentRound;
+  const optimizedTargetSvg = current?.challenge.renderedSvg
+    ? optimizeTypstSvgForSnippet(current.challenge.renderedSvg)
+    : null;
   const timerLabel = formatDuration(session?.timeRemainingMs ?? 0);
   const normalizedStatus = status.trim().toLowerCase();
   const feedbackTone = normalizedStatus.startsWith("accepted")
@@ -211,14 +215,14 @@ export function PlayClient() {
       : "border-white/8 bg-white/5 text-slate-300";
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-2.5">
       {fatalError ? (
         <div className="rounded-[22px] border border-rose-400/20 bg-rose-400/10 px-4 py-4 text-sm leading-6 text-rose-100">
           {fatalError}
         </div>
       ) : null}
-      <Card className="border-cyan-300/10 bg-[rgba(9,17,31,0.88)] p-4 sm:p-5">
-        <div className="grid gap-3 sm:grid-cols-4">
+      <Card className="p-2">
+        <div className="grid gap-2 sm:grid-cols-4">
           <TopBarStat label="Timer" value={timerLabel} accent />
           <TopBarStat label="Score" value={String(session?.score ?? 0)} />
           <TopBarStat label="Streak" value={String(session?.streak ?? 0)} />
@@ -226,87 +230,94 @@ export function PlayClient() {
         </div>
       </Card>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,0.92fr),minmax(0,1.08fr)]">
-        <div className="space-y-6">
-          <Card className="space-y-5">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs uppercase tracking-[0.26em] text-cyan-300">Rendered Target</p>
-                <h2 className="mt-2 text-2xl font-semibold text-white">{current?.challenge.title ?? "Loading challenge"}</h2>
-              </div>
-              <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.18em] text-slate-300">
-                {current?.challenge.difficulty ?? "easy"}
-              </div>
-            </div>
-            <div className="rounded-[26px] border border-white/8 bg-white p-4 shadow-inner sm:p-6">
-              {current ? (
-                <div className="max-h-[26rem] overflow-auto rounded-2xl" dangerouslySetInnerHTML={{ __html: current.challenge.renderedSvg }} />
-              ) : (
-                <div className="flex h-64 items-center justify-center text-slate-500">Loading render...</div>
-              )}
-            </div>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <InlineMeta label="Round" value={String(current?.roundNumber ?? 0)} />
-              <InlineMeta label="Solved" value={String(session?.solvedCount ?? 0)} />
-              <InlineMeta label="Attempts" value={String(session?.attemptedCount ?? 0)} />
-            </div>
-          </Card>
+      <div className="mx-auto flex max-w-5xl flex-col gap-3">
+        <div className="grid items-stretch gap-3 md:grid-cols-2">
+          <div className="space-y-2">
+            <Card className="flex h-full min-h-[68px] flex-col space-y-1 p-2">
+              <p className="text-[10px] uppercase tracking-[0.16em] text-[var(--muted)]">Live Preview</p>
+              <LiveRenderPreview
+                source={source}
+                inputMode={current?.challenge.inputMode ?? "math"}
+                enabled={Boolean(current) && !isPending}
+              />
+            </Card>
+          </div>
 
-          <Card className="space-y-4">
-            <LiveRenderPreview
-              source={source}
-              inputMode={current?.challenge.inputMode ?? "math"}
-              enabled={Boolean(current) && !isPending}
-            />
-          </Card>
+          <div className="space-y-2">
+            <Card className="flex h-full min-h-[68px] flex-col space-y-1 p-2">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-[10px] uppercase tracking-[0.16em] text-[var(--muted)]">Target</p>
+                  <h2 className="mt-0.5 text-[13px] font-semibold text-[var(--text)]">{current?.challenge.title ?? "Loading challenge"}</h2>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="rounded-full border border-[color:var(--line)] bg-[var(--panel-strong)] px-2 py-0.5 text-[9px] uppercase tracking-[0.12em] text-[var(--muted)]">
+                    {current?.challenge.difficulty ?? "easy"}
+                  </div>
+                  <div className="rounded-full border border-[color:var(--line)] bg-[var(--panel-strong)] px-2 py-0.5 text-[9px] uppercase tracking-[0.12em] text-[var(--muted)]">
+                    Round {String(current?.roundNumber ?? 0)}
+                  </div>
+                </div>
+              </div>
+              <div className="typst-snippet-frame flex-1">
+                {current && optimizedTargetSvg ? (
+                  <div
+                    className="typst-snippet"
+                    dangerouslySetInnerHTML={{ __html: optimizedTargetSvg }}
+                  />
+                ) : (
+                  <div className="flex h-full min-h-[30px] items-center justify-center text-[var(--muted)]">Loading render...</div>
+                )}
+              </div>
+              <div className="min-h-[4px]" />
+            </Card>
+          </div>
         </div>
 
-        <div className="space-y-6">
-          <Card className="space-y-4">
-            <TypstEditor
-              value={source}
-              onChange={setSource}
-              onSubmit={handleSubmit}
-              onSkip={handleSkip}
-              inputMode={current?.challenge.inputMode ?? "math"}
+        <Card className="mx-auto w-full max-w-5xl space-y-2.5 p-2.5">
+          <TypstEditor
+            value={source}
+            onChange={setSource}
+            onSubmit={handleSubmit}
+            onSkip={handleSkip}
+            inputMode={current?.challenge.inputMode ?? "math"}
+            disabled={!current || isPending}
+            isSubmitting={isPending}
+          />
+          <div className={`rounded-[16px] border px-3 py-2 text-sm leading-6 ${feedbackTone}`}>{status}</div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button onClick={handleSubmit} disabled={!current || !source.trim() || isPending} className="px-4 py-2 text-sm">
+              Submit
+            </Button>
+            <button
+              onClick={handleSkip}
               disabled={!current || isPending}
-              isSubmitting={isPending}
-            />
-            <div className={`rounded-[22px] border px-4 py-4 text-sm leading-6 ${feedbackTone}`}>{status}</div>
-            <div className="flex flex-wrap items-center gap-3">
-              <Button onClick={handleSubmit} disabled={!current || !source.trim() || isPending} className="px-6 py-3 text-base">
-                Submit
-              </Button>
-              <button
-                onClick={handleSkip}
-                disabled={!current || isPending}
-                className="rounded-full border border-white/10 bg-white/5 px-6 py-3 text-sm font-medium text-white transition hover:bg-white/10 disabled:opacity-50"
-              >
-                Skip
-              </button>
-              <button
-                onClick={() => {
-                  setSource("");
+              className="rounded-full border border-[color:var(--line)] bg-[var(--panel-strong)] px-4 py-2 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--panel)] disabled:opacity-50"
+            >
+              Skip
+            </button>
+            <button
+              onClick={() => {
+                setSource("");
 
-                  if (session?.currentRound) {
-                    clearDraft(session.id, session.currentRound.roundId);
-                  }
-                }}
-                disabled={isPending}
-                className="rounded-full border border-white/10 px-5 py-3 text-sm font-medium text-slate-300 transition hover:bg-white/5 disabled:opacity-50"
-              >
-                Clear Draft
-              </button>
-              <button
-                onClick={handleFinish}
-                disabled={!session || isPending}
-                className="ml-auto text-sm text-slate-400 underline-offset-4 transition hover:text-white hover:underline"
-              >
-                End run
-              </button>
-            </div>
-          </Card>
-        </div>
+                if (session?.currentRound) {
+                  clearDraft(session.id, session.currentRound.roundId);
+                }
+              }}
+              disabled={isPending}
+              className="rounded-full border border-[color:var(--line)] px-3.5 py-2 text-sm font-medium text-[var(--muted)] transition hover:bg-[var(--panel-strong)] disabled:opacity-50"
+            >
+              Clear Draft
+            </button>
+            <button
+              onClick={handleFinish}
+              disabled={!session || isPending}
+              className="ml-auto text-sm text-[var(--muted)] underline-offset-4 transition hover:text-[var(--text)] hover:underline"
+            >
+              End run
+            </button>
+          </div>
+        </Card>
       </div>
     </div>
   );
@@ -323,21 +334,14 @@ function clearDraft(sessionId: string, roundId: string) {
 function TopBarStat({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) {
   return (
     <div
-      className={`rounded-[24px] border px-4 py-4 ${
-        accent ? "border-cyan-300/25 bg-cyan-300/10 text-cyan-100" : "border-white/8 bg-white/5 text-white"
+      className={`rounded-[14px] border px-2.5 py-2 ${
+        accent
+          ? "border-[color:var(--line-strong)] bg-[var(--panel)] text-[var(--text)]"
+          : "border-[color:var(--line)] bg-[var(--panel-strong)] text-[var(--text)]"
       }`}
     >
-      <p className="text-xs uppercase tracking-[0.22em] text-slate-400">{label}</p>
-      <p className="mt-2 text-2xl font-semibold">{value}</p>
-    </div>
-  );
-}
-
-function InlineMeta({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-[22px] border border-white/8 bg-white/5 px-4 py-3">
-      <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{label}</p>
-      <p className="mt-1 text-lg font-semibold text-white">{value}</p>
+      <p className="text-[9px] uppercase tracking-[0.12em] text-[var(--muted)]">{label}</p>
+      <p className="mt-0.5 text-base font-semibold">{value}</p>
     </div>
   );
 }
