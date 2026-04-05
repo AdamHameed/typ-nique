@@ -24,10 +24,10 @@ export function optimizeTypstSvgForSnippet(svg: string) {
   const minY = Math.min(...ys);
   const maxY = Math.max(...ys);
 
-  const cropX = Math.max(0, minX - 20);
-  const cropY = Math.max(0, minY - 18);
   const cropWidth = Math.max(140, maxX - minX + 40);
   const cropHeight = Math.max(72, maxY - minY + 36);
+  const cropX = (minX + maxX) / 2 - cropWidth / 2;
+  const cropY = Math.max(0, minY - 18);
 
   let nextSvg = trimmed;
 

@@ -63,7 +63,7 @@ export async function getChallengeById(challengeId: string): Promise<ChallengePr
   };
 }
 
-export async function getChallengeRotation(limit = 10) {
+export async function getChallengeRotation(limit?: number) {
   return prisma.challenge.findMany({
     where: { status: "ACTIVE" },
     include: {
@@ -71,7 +71,7 @@ export async function getChallengeRotation(limit = 10) {
       canonicalArtifact: true,
       alternateSources: true
     },
-    take: limit,
+    ...(typeof limit === "number" ? { take: limit } : {}),
     orderBy: { createdAt: "asc" }
   });
 }

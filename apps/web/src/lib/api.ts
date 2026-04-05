@@ -66,6 +66,14 @@ export async function getPersonalLeaderboards(runId: string, limit = 5) {
   return fetchJson<{ data: PersonalLeaderboardResponse }>(`/api/v1/leaderboards/personal?${params.toString()}`);
 }
 
+export async function getCurrentPersonalLeaderboards(limit = 5) {
+  const params = new URLSearchParams({
+    limit: String(limit)
+  });
+
+  return fetchJson<{ data: PersonalLeaderboardResponse }>(`/api/v1/leaderboards/personal/current?${params.toString()}`);
+}
+
 export async function createGameSession(mode: "practice" | "daily" = "practice") {
   return fetchJson<{ data: GameSessionState }>("/api/v1/game-sessions", {
     method: "POST",

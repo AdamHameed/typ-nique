@@ -17,9 +17,9 @@ export function ResultsOverview({
       <div className="grid gap-6 xl:grid-cols-[0.88fr,1.12fr]">
         <Card className="space-y-6">
           <div className="space-y-3">
-            <p className="text-xs uppercase tracking-[0.26em] text-[var(--muted)]">Run Summary</p>
+            <p className="text-sm text-[var(--muted)]">Run summary</p>
             <p className="text-6xl font-semibold tracking-tight text-[var(--text)]">{result.score}</p>
-            <p className="max-w-md text-base leading-7 text-[var(--muted)]">
+            <p className="max-w-md texnique-note">
               {result.solvedCount} solved, {result.attemptedCount} attempted, and {solvedRate}% accuracy across the full session.
             </p>
           </div>
@@ -31,8 +31,8 @@ export function ResultsOverview({
             <ResultStat label="Window" value={`${Math.round(result.durationMs / 60000)} min`} />
           </div>
 
-          <div className="rounded-[24px] border border-[color:var(--line)] bg-[var(--panel-strong)] p-4">
-            <p className="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Best Round</p>
+          <div className="texnique-list-item">
+            <p className="text-sm text-[var(--muted)]">Best round</p>
             <p className="mt-2 text-lg font-semibold text-[var(--text)]">{topRound?.challengeTitle ?? "No completed rounds yet"}</p>
             <p className="mt-1 text-sm text-[var(--muted)]">
               {topRound ? `${topRound.scoreAwarded} points • ${topRound.verdict} via ${topRound.matchTier}` : "Finish a run to surface standout prompts here."}
@@ -43,11 +43,8 @@ export function ResultsOverview({
             <Link href="/play">
               <Button className="px-6 py-3 text-base">Play Again</Button>
             </Link>
-            <Link
-              href={`/leaderboard?scope=daily&runId=${result.id}`}
-              className="inline-flex items-center justify-center rounded-full border border-[color:var(--line)] bg-[var(--panel-strong)] px-6 py-3 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--panel)]"
-            >
-              View Leaderboards
+            <Link href={`/leaderboard?runId=${result.id}`}>
+              <Button className="px-6 py-3 text-base">View Leaderboards</Button>
             </Link>
           </div>
         </Card>
@@ -55,28 +52,28 @@ export function ResultsOverview({
         <Card>
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-semibold text-[var(--text)]">Per-problem breakdown</h2>
-              <p className="mt-1 text-sm text-[var(--muted)]">Every round, verdict, and score swing from the session.</p>
+              <h2 className="text-3xl font-semibold text-[var(--text)]">Per-problem breakdown</h2>
+              <p className="mt-2 texnique-note">Every round, verdict, and score swing from the session.</p>
             </div>
           </div>
 
-          <div className="mt-5 space-y-3">
+          <div className="mt-5 texnique-list">
             {result.rounds.map((round) => (
-              <div key={round.roundId} className="rounded-[24px] border border-[color:var(--line)] bg-[var(--panel-strong)] px-4 py-4">
+              <div key={round.roundId} className="texnique-list-item">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
-                    <p className="font-medium text-[var(--text)]">{round.position}. {round.challengeTitle}</p>
+                    <p className="text-lg font-medium text-[var(--text)]">{round.position}. {round.challengeTitle}</p>
                     <p className="mt-1 text-sm text-[var(--muted)]">
                       {round.verdict} via {round.matchTier} • {round.difficulty}
                     </p>
                   </div>
-                  <div className="rounded-full border border-[color:var(--line)] bg-[var(--panel)] px-3 py-1 text-sm font-medium text-[var(--text)]">
+                  <div className="border-2 border-[color:var(--text)] px-3 py-1 text-base text-[var(--text)]">
                     +{round.scoreAwarded}
                   </div>
                 </div>
-                {round.feedback ? <p className="mt-3 text-sm leading-6 text-[var(--muted)]">{round.feedback}</p> : null}
+                {round.feedback ? <p className="mt-3 texnique-note">{round.feedback}</p> : null}
                 {round.submittedSource ? (
-                  <div className="mt-3 rounded-2xl border border-[color:var(--line)] bg-[var(--panel)] p-3 font-[var(--font-mono)] text-xs text-[var(--text)]">
+                  <div className="texnique-code-block mt-3">
                     {round.submittedSource}
                   </div>
                 ) : null}
@@ -124,13 +121,13 @@ function RunsPanel({
   return (
     <Card>
       <div>
-        <h2 className="text-2xl font-semibold text-[var(--text)]">{title}</h2>
-        <p className="mt-1 text-sm text-[var(--muted)]">{description}</p>
+        <h2 className="text-3xl font-semibold text-[var(--text)]">{title}</h2>
+        <p className="mt-2 texnique-note">{description}</p>
       </div>
 
-      <div className="mt-5 space-y-3">
+      <div className="mt-5 texnique-list">
         {runs.length === 0 ? (
-          <div className="rounded-[24px] border border-dashed border-[color:var(--line)] px-4 py-6 text-sm text-[var(--muted)]">
+          <div className="texnique-note">
             {emptyLabel}
           </div>
         ) : (
@@ -138,18 +135,18 @@ function RunsPanel({
             <Link
               key={run.runId}
               href={`/results/${run.runId}`}
-              className="block rounded-[24px] border border-[color:var(--line)] bg-[var(--panel-strong)] px-4 py-4 transition hover:bg-[var(--panel)]"
+              className="texnique-list-item block"
             >
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <p className="font-medium text-[var(--text)]">{run.label}</p>
+                  <p className="text-lg font-medium text-[var(--text)]">{run.label}</p>
                   <p className="mt-1 text-sm text-[var(--muted)]">
                     {run.solvedCount} solved • {Math.round(run.accuracy * 100)}% accuracy
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-lg font-semibold text-[var(--text)]">{run.score}</p>
-                  <p className="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Score</p>
+                  <p className="text-2xl font-semibold text-[var(--text)]">{run.score}</p>
+                  <p className="text-sm text-[var(--muted)]">Score</p>
                 </div>
               </div>
             </Link>
@@ -162,9 +159,9 @@ function RunsPanel({
 
 function ResultStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[22px] border border-[color:var(--line)] bg-[var(--panel-strong)] px-4 py-4">
-      <p className="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">{label}</p>
-      <p className="mt-2 text-2xl font-semibold text-[var(--text)]">{value}</p>
+    <div className="texnique-list-item">
+      <p className="text-sm text-[var(--muted)]">{label}</p>
+      <p className="mt-2 text-3xl font-semibold text-[var(--text)]">{value}</p>
     </div>
   );
 }

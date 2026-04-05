@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { GameSessionState, PreviewRenderResponse } from "@typ-nique/types";
-import { Card } from "@typ-nique/ui";
 import { LiveRenderPreview } from "./live-render-preview";
+import { TypstSnippet } from "./typst-snippet";
 import { TypstEditor } from "./typst-editor";
 import { createGameSession, finishSession, getGameSession, skipRound, submitGameAnswer } from "../lib/api";
 import { optimizeTypstSvgForSnippet } from "../lib/typst-snippet";
@@ -216,6 +216,14 @@ export function PlayClient({ mode = "practice" }: { mode?: "practice" | "daily" 
     });
   }
 
+  function handleClearDraft() {
+    setSource("");
+
+    if (session?.currentRound) {
+      clearDraft(session.id, session.currentRound.roundId);
+    }
+  }
+
   useEffect(() => {
     if (!session?.currentRound) {
       return;
@@ -271,121 +279,107 @@ export function PlayClient({ mode = "practice" }: { mode?: "practice" | "daily" 
     : null;
   const timerLabel = formatDuration(session?.timeRemainingMs ?? 0);
   const normalizedStatus = status.trim().toLowerCase();
-  const feedbackTone = normalizedStatus.startsWith("accepted")
-    ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-200"
-    : normalizedStatus.includes("render") || normalizedStatus.includes("checking")
-      ? "border-amber-300/20 bg-amber-300/10 text-amber-100"
+  const statusClass = fatalError
+    ? "texnique-status texnique-status--error"
+    : normalizedStatus.startsWith("accepted")
+      ? "texnique-status texnique-status--success"
       : normalizedStatus.includes("error") ||
           normalizedStatus.includes("incorrect") ||
           normalizedStatus.includes("did not match") ||
           normalizedStatus.includes("unavailable") ||
           normalizedStatus.includes("compile")
-        ? "border-rose-400/20 bg-rose-400/10 text-rose-100"
-        : "border-[color:var(--line)] bg-[var(--panel-strong)] text-[var(--muted)]";
+        ? "texnique-status texnique-status--error"
+        : normalizedStatus.includes("render") || normalizedStatus.includes("checking")
+          ? "texnique-status texnique-status--pending"
+          : "texnique-status";
 
   return (
-    <div className="space-y-2.5">
-      {fatalError ? (
-        <div className="rounded-[22px] border border-rose-400/20 bg-rose-400/10 px-4 py-4 text-sm leading-6 text-rose-100">
-          {fatalError}
-        </div>
-      ) : null}
-      <Card className="p-2">
-        <div className="grid gap-2 sm:grid-cols-4">
-          <TopBarStat label="Timer" value={timerLabel} accent />
-          <TopBarStat label="Score" value={String(session?.score ?? 0)} />
-          <TopBarStat label="Streak" value={String(session?.streak ?? 0)} />
-          <TopBarStat label="Accuracy" value={`${Math.round((session?.accuracy ?? 0) * 100)}%`} />
-        </div>
-      </Card>
+    <main className="texnique-page">
+      <div className="texnique-container">
+        <p className="texnique-title">Typ-Nique</p>
+        <p className="texnique-subtitle">A Typst Typesetting Game</p>
 
-      <div className="mx-auto flex max-w-5xl flex-col gap-3">
-        <div className="grid items-stretch gap-3 md:grid-cols-2">
-          <div className="space-y-2">
-            <Card className="flex h-full min-h-[68px] flex-col space-y-1 p-2">
-              <p className="text-[10px] uppercase tracking-[0.16em] text-[var(--muted)]">Live Preview</p>
-              <LiveRenderPreview
-                source={source}
-                inputMode={current?.challenge.inputMode ?? "math"}
-                enabled={Boolean(current) && !isPending}
-                onPreviewResult={setLatestPreview}
-              />
-            </Card>
-          </div>
-
-          <div className="space-y-2">
-            <Card className="flex h-full min-h-[68px] flex-col space-y-1 p-2">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-[10px] uppercase tracking-[0.16em] text-[var(--muted)]">Target</p>
-                  <h2 className="mt-0.5 text-[13px] font-semibold text-[var(--text)]">{current?.challenge.title ?? "Loading challenge"}</h2>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="rounded-full border border-[color:var(--line)] bg-[var(--panel-strong)] px-2 py-0.5 text-[9px] uppercase tracking-[0.12em] text-[var(--muted)]">
-                    {current?.challenge.difficulty ?? "easy"}
-                  </div>
-                  <div className="rounded-full border border-[color:var(--line)] bg-[var(--panel-strong)] px-2 py-0.5 text-[9px] uppercase tracking-[0.12em] text-[var(--muted)]">
-                    Round {String(current?.roundNumber ?? 0)}
-                  </div>
-                </div>
-              </div>
-              <div className="typst-snippet-frame flex-1">
-                {current && optimizedTargetSvg ? (
-                  <div
-                    className="typst-snippet"
-                    dangerouslySetInnerHTML={{ __html: optimizedTargetSvg }}
-                  />
-                ) : (
-                  <div className="flex h-full min-h-[30px] items-center justify-center text-[var(--muted)]">Loading render...</div>
-                )}
-              </div>
-              <div className="min-h-[4px]" />
-            </Card>
-          </div>
-        </div>
-
-        <Card className="mx-auto w-full max-w-5xl space-y-2.5 p-2.5">
-          <TypstEditor
-            value={source}
-            onChange={setSource}
-            inputMode={current?.challenge.inputMode ?? "math"}
-            disabled={!current || isPending}
-            isSubmitting={isPending}
-            autoFocusKey={current ? `${session?.id ?? "session"}:${current.roundId}` : "inactive"}
-          />
-          <div className={`rounded-[16px] border px-3 py-2 text-sm leading-6 ${feedbackTone}`}>{status}</div>
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="texnique-top-row">
+          <div className="texnique-button-row">
             <button
               onClick={handleSkip}
               disabled={!current || isPending}
-              className="rounded-full border border-[color:var(--line)] bg-[var(--panel-strong)] px-4 py-2 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--panel)] disabled:opacity-50"
+              className="texnique-button"
             >
-              Skip
-            </button>
-            <button
-              onClick={() => {
-                setSource("");
-
-                if (session?.currentRound) {
-                  clearDraft(session.id, session.currentRound.roundId);
-                }
-              }}
-              disabled={isPending}
-              className="rounded-full border border-[color:var(--line)] px-3.5 py-2 text-sm font-medium text-[var(--muted)] transition hover:bg-[var(--panel-strong)] disabled:opacity-50"
-            >
-              Clear Draft
+              Skip This Problem
             </button>
             <button
               onClick={handleFinish}
               disabled={!session || isPending}
-              className="ml-auto text-sm text-[var(--muted)] underline-offset-4 transition hover:text-[var(--text)] hover:underline"
+              className="texnique-button"
             >
-              End run
+              End Game
             </button>
           </div>
-        </Card>
+
+          <div className="texnique-top-stats">
+            <p className="texnique-metric">
+              <b>Score:</b> <span>{session?.score ?? 0}</span>
+            </p>
+            <p className="texnique-metric">
+              <b>Streak:</b> <span>{session?.streak ?? 0}</span>
+            </p>
+            <p className="texnique-metric">
+              <b>Time:</b> <span>{timerLabel}</span>
+            </p>
+          </div>
+        </div>
+
+        <p className="texnique-problem-header">
+          <span className="texnique-problem-title">{current?.challenge.title ?? "Loading challenge"}</span>
+          <span className="texnique-problem-meta">
+            {current
+              ? `${current.challenge.difficulty ?? "easy"} · Round ${String(current.roundNumber)}`
+              : ""}
+          </span>
+        </p>
+
+        <p className="texnique-copy">Try to create the following render:</p>
+
+        <div className="texnique-math-display texnique-target-display">
+          {current && optimizedTargetSvg ? (
+            <TypstSnippet svg={optimizedTargetSvg} />
+          ) : (
+            <div className="texnique-preview-placeholder">Loading render...</div>
+          )}
+        </div>
+
+        <p className="texnique-copy">This is what your output looks like:</p>
+
+        <LiveRenderPreview
+          source={source}
+          inputMode={current?.challenge.inputMode ?? "math"}
+          enabled={Boolean(current) && !isPending}
+          onPreviewResult={setLatestPreview}
+          shadowSvg={optimizedTargetSvg}
+        />
+
+        <TypstEditor
+          value={source}
+          onChange={setSource}
+          inputMode={current?.challenge.inputMode ?? "math"}
+          disabled={!current || isPending}
+          isSubmitting={isPending}
+          autoFocusKey={current ? `${session?.id ?? "session"}:${current.roundId}` : "inactive"}
+        />
+
+        <div className="texnique-bottom-row">
+          <div className={statusClass}>{fatalError ?? status}</div>
+          <button
+            onClick={handleClearDraft}
+            disabled={isPending}
+            className="texnique-button texnique-button--small"
+          >
+            Clear Draft
+          </button>
+        </div>
       </div>
-    </div>
+    </main>
   );
 }
 
@@ -399,21 +393,6 @@ function getSessionStorageKey(mode: "practice" | "daily") {
 
 function clearDraft(sessionId: string, roundId: string) {
   window.localStorage.removeItem(getDraftStorageKey(sessionId, roundId));
-}
-
-function TopBarStat({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) {
-  return (
-    <div
-      className={`rounded-[14px] border px-2.5 py-2 ${
-        accent
-          ? "border-[color:var(--line-strong)] bg-[var(--panel)] text-[var(--text)]"
-          : "border-[color:var(--line)] bg-[var(--panel-strong)] text-[var(--text)]"
-      }`}
-    >
-      <p className="text-[9px] uppercase tracking-[0.12em] text-[var(--muted)]">{label}</p>
-      <p className="mt-0.5 text-base font-semibold">{value}</p>
-    </div>
-  );
 }
 
 function formatDuration(durationMs: number) {

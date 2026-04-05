@@ -6,24 +6,22 @@ import { getLeaderboard, getPersonalLeaderboards } from "../../lib/api";
 export default async function LeaderboardPage({
   searchParams
 }: {
-  searchParams?: { scope?: string; runId?: string };
+  searchParams?: { runId?: string };
 }) {
-  const requestedScope = searchParams?.scope;
-  const activeScope = requestedScope === "global" || requestedScope === "weekly" || requestedScope === "daily" ? requestedScope : "daily";
-  const leaderboard = await getLeaderboard(activeScope, 25).catch(() => null);
+  const leaderboard = await getLeaderboard("weekly", 25).catch(() => null);
   const personal = searchParams?.runId ? await getPersonalLeaderboards(searchParams.runId, 5).catch(() => null) : null;
 
   return (
     <SiteShell>
       <PageHeader
         eyebrow="Competition"
-        title="Leaderboard"
-        description="Global, daily, and weekly boards with personal bests and recent-run history. Practical now, ready to scale later."
+        title="Weekly Leaderboard"
+        description="The top weekly scores, plus your personal bests and recent run history."
       />
       {leaderboard?.data ? (
-        <LeaderboardTable board={leaderboard.data} personal={personal?.data ?? null} activeScope={activeScope} />
+        <LeaderboardTable board={leaderboard.data} personal={personal?.data ?? null} />
       ) : (
-        <p className="text-[var(--muted)]">Leaderboard data is unavailable right now.</p>
+        <p className="texnique-note">Leaderboard data is unavailable right now.</p>
       )}
     </SiteShell>
   );

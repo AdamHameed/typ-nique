@@ -1,9 +1,15 @@
+import { notFound } from "next/navigation";
 import { DailyChallengePanel } from "../../components/daily-challenge-panel";
 import { PageHeader } from "../../components/page-header";
 import { SiteShell } from "../../components/site-shell";
 import { getDailyChallenge, getDailyLeaderboard } from "../../lib/api";
+import { featureFlags } from "../../lib/features";
 
 export default async function DailyPage() {
+  if (!featureFlags.dailyMode) {
+    notFound();
+  }
+
   const [challenge, leaderboard] = await Promise.all([
     getDailyChallenge().catch(() => ({ data: null })),
     getDailyLeaderboard().catch(() => ({ data: [] }))

@@ -1,77 +1,101 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { LeaderboardResponse, PersonalLeaderboardResponse } from "@typ-nique/types";
 import { Card } from "@typ-nique/ui";
+import { getCurrentPersonalLeaderboards } from "../lib/api";
 
 export function LeaderboardTable({
   board,
-  personal,
-  activeScope
+  personal
 }: {
   board: LeaderboardResponse;
   personal: PersonalLeaderboardResponse | null;
-  activeScope: "global" | "daily" | "weekly";
 }) {
+  const [currentPersonal, setCurrentPersonal] = useState<PersonalLeaderboardResponse | null>(personal);
+  const [personalStatus, setPersonalStatus] = useState<"idle" | "loading" | "ready" | "error">(personal ? "ready" : "idle");
+
+  useEffect(() => {
+    setCurrentPersonal(personal);
+    setPersonalStatus(personal ? "ready" : "idle");
+  }, [personal]);
+
+  useEffect(() => {
+    if (personal) {
+      return;
+    }
+
+    let cancelled = false;
+    setPersonalStatus("loading");
+
+    void getCurrentPersonalLeaderboards(5)
+      .then((response) => {
+        if (cancelled) {
+          return;
+        }
+
+        setCurrentPersonal(response.data);
+        setPersonalStatus("ready");
+      })
+      .catch(() => {
+        if (cancelled) {
+          return;
+        }
+
+        setPersonalStatus("error");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [personal]);
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap gap-3">
-        {(["global", "daily", "weekly"] as const).map((scope) => (
-          <Link
-            key={scope}
-            href={`/leaderboard?scope=${scope}`}
-            className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
-              scope === activeScope
-                ? "border-[color:var(--line-strong)] bg-[var(--panel-strong)] text-[var(--text)]"
-                : "border-[color:var(--line)] bg-[var(--panel)] text-[var(--muted)] hover:bg-[var(--panel-strong)]"
-            }`}
-          >
-            {scope[0]!.toUpperCase() + scope.slice(1)}
-          </Link>
-        ))}
-      </div>
-
       <div className="grid gap-6 xl:grid-cols-[1.08fr,0.92fr]">
         <Card>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <h2 className="text-2xl font-semibold text-[var(--text)]">{board.label}</h2>
-              <p className="mt-1 text-sm text-[var(--muted)]">
+              <h2 className="text-4xl font-semibold text-[var(--text)]">Highest Weekly Scores</h2>
+              <p className="mt-2 texnique-note">
                 Ranked by score, then earlier finish time. Guests are shown with anonymized labels.
               </p>
             </div>
-            <div className="rounded-full border border-[color:var(--line)] bg-[var(--panel-strong)] px-3 py-1 text-xs uppercase tracking-[0.22em] text-[var(--muted)]">
+            <div className="border-2 border-[color:var(--text)] px-3 py-1 text-sm text-[var(--muted)]">
               {board.scope}
             </div>
           </div>
 
-          <div className="mt-6 overflow-hidden rounded-[26px] border border-[color:var(--line)]">
-            <table className="min-w-full divide-y divide-[color:var(--line)] text-left text-sm">
-              <thead className="bg-[var(--panel-strong)] text-[var(--muted)]">
+          <div className="texnique-table-wrap mt-6">
+            <table className="texnique-table">
+              <thead>
                 <tr>
-                  <th className="px-5 py-4">Rank</th>
-                  <th className="px-5 py-4">Player</th>
-                  <th className="px-5 py-4">Score</th>
-                  <th className="px-5 py-4">Accuracy</th>
-                  <th className="px-5 py-4">Solved</th>
-                  <th className="px-5 py-4">Finished</th>
+                  <th>Rank</th>
+                  <th>Player</th>
+                  <th>Score</th>
+                  <th>Accuracy</th>
+                  <th>Solved</th>
+                  <th>Finished</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[color:var(--line)] bg-[var(--panel)]">
+              <tbody>
                 {board.entries.map((entry) => (
-                  <tr key={entry.runId} className="transition hover:bg-[var(--panel-strong)]">
-                    <td className="px-5 py-4 text-[var(--muted)]">{entry.rank}</td>
-                    <td className="px-5 py-4">
+                  <tr key={entry.runId}>
+                    <td className="text-[var(--muted)]">{entry.rank}</td>
+                    <td>
                       <div className="font-medium text-[var(--text)]">{entry.userName}</div>
                       <div className="text-xs text-[var(--muted)]">{entry.isGuest ? "Guest run" : "Registered player"}</div>
                     </td>
-                    <td className="px-5 py-4 text-[var(--text)]">{entry.score}</td>
-                    <td className="px-5 py-4">{Math.round(entry.accuracy * 100)}%</td>
-                    <td className="px-5 py-4">{entry.solvedCount ?? 0}</td>
-                    <td className="px-5 py-4 text-[var(--muted)]">{entry.createdAt}</td>
+                    <td className="text-[var(--text)]">{entry.score}</td>
+                    <td>{Math.round(entry.accuracy * 100)}%</td>
+                    <td>{entry.solvedCount ?? 0}</td>
+                    <td className="text-[var(--muted)]">{entry.createdAt}</td>
                   </tr>
                 ))}
                 {board.entries.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-5 py-10 text-center text-[var(--muted)]">
+                    <td colSpan={6} className="text-center text-[var(--muted)]">
                       No completed runs have landed on this board yet.
                     </td>
                   </tr>
@@ -85,20 +109,22 @@ export function LeaderboardTable({
           <LeaderboardRunsCard
             title="Best Personal Scores"
             description={
-              personal
-                ? personal.guestMode
+              currentPersonal
+                ? currentPersonal.guestMode
                   ? "Guest history is scoped to the current guest session for now."
                   : "Your strongest completed runs, ready for quick comparison."
-                : "Open a run result to load personal bests here."
+                : personalStatus === "loading"
+                  ? "Loading personal history for this browser session."
+                  : "Your best runs for the current account or guest session."
             }
-            runs={personal?.bestScores ?? []}
-            emptyLabel="No personal bests available yet."
+            runs={currentPersonal?.bestScores ?? []}
+            emptyLabel={personalStatus === "error" ? "Personal history is unavailable right now." : "No personal bests available yet."}
           />
           <LeaderboardRunsCard
             title="Recent Runs"
             description="A compact history of the latest completed runs for this player or guest session."
-            runs={personal?.recentRuns ?? []}
-            emptyLabel="No recent runs available yet."
+            runs={currentPersonal?.recentRuns ?? []}
+            emptyLabel={personalStatus === "error" ? "Recent run history is unavailable right now." : "No recent runs available yet."}
           />
         </div>
       </div>
@@ -120,13 +146,13 @@ function LeaderboardRunsCard({
   return (
     <Card>
       <div>
-        <h2 className="text-2xl font-semibold text-[var(--text)]">{title}</h2>
-        <p className="mt-1 text-sm text-[var(--muted)]">{description}</p>
+        <h2 className="text-3xl font-semibold text-[var(--text)]">{title}</h2>
+        <p className="mt-2 texnique-note">{description}</p>
       </div>
 
-      <div className="mt-5 space-y-3">
+      <div className="mt-5 texnique-list">
         {runs.length === 0 ? (
-          <div className="rounded-[24px] border border-dashed border-[color:var(--line)] px-4 py-6 text-sm text-[var(--muted)]">
+          <div className="texnique-note">
             {emptyLabel}
           </div>
         ) : (
@@ -134,18 +160,18 @@ function LeaderboardRunsCard({
             <Link
               key={run.runId}
               href={`/results/${run.runId}`}
-              className="block rounded-[24px] border border-[color:var(--line)] bg-[var(--panel-strong)] px-4 py-4 transition hover:bg-[var(--panel)]"
+              className="texnique-list-item block"
             >
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <p className="font-medium text-[var(--text)]">{run.label}</p>
+                  <p className="text-lg font-medium text-[var(--text)]">{run.label}</p>
                   <p className="mt-1 text-sm text-[var(--muted)]">
                     {run.solvedCount} solved • {Math.round(run.accuracy * 100)}% accuracy
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-lg font-semibold text-[var(--text)]">{run.score}</p>
-                  <p className="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">Score</p>
+                  <p className="text-2xl font-semibold text-[var(--text)]">{run.score}</p>
+                  <p className="text-sm text-[var(--muted)]">Score</p>
                 </div>
               </div>
             </Link>

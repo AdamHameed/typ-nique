@@ -43,11 +43,11 @@ export function ResultsPageClient({ runId }: { runId: string }) {
   }, [runId]);
 
   if (status === "loading") {
-    return <p className="text-[var(--muted)]">Loading results...</p>;
+    return <p className="texnique-note">Loading results...</p>;
   }
 
   if (status === "error" || !result) {
-    return <p className="text-[var(--muted)]">Result not found.</p>;
+    return <p className="texnique-note">Result not found.</p>;
   }
 
   return <ResultsOverview result={result} personal={personal} />;
