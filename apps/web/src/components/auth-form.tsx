@@ -46,17 +46,17 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   }
 
   return (
-    <Card className="mx-auto max-w-md space-y-4 p-5">
+    <Card className="mx-auto max-w-xl space-y-5">
       <div>
-        <h1 className="text-3xl font-semibold text-[var(--text)]">{mode === "signup" ? "Create account" : "Log in"}</h1>
-        <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+        <h1 className="text-4xl font-semibold text-[var(--text)]">{mode === "signup" ? "Create account" : "Log in"}</h1>
+        <p className="mt-2 texnique-note">
           {mode === "signup"
-            ? "Save your history, keep your daily rankings, and turn your current guest progress into a real account."
+            ? "Save your history, keep your rankings, and turn your current guest progress into a real account."
             : "Pick up your persistent history and personal bests without losing guest progress from this browser."}
         </p>
       </div>
 
-      <form className="space-y-3" onSubmit={handleSubmit}>
+      <form className="space-y-4" onSubmit={handleSubmit}>
         {mode === "signup" ? (
           <>
             <Input label="Username" value={username} onChange={setUsername} autoComplete="username" />
@@ -74,17 +74,17 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
         <Input label="Password" value={password} onChange={setPassword} type="password" autoComplete={mode === "signup" ? "new-password" : "current-password"} />
 
         {status ? (
-          <div className="rounded-[16px] border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-sm text-rose-200">
+          <div className="texnique-status texnique-status--error">
             {status}
           </div>
         ) : null}
 
-        <Button type="submit" disabled={isPending} className="w-full px-4 py-3 text-sm">
+        <Button type="submit" disabled={isPending} className="w-full justify-center px-4 py-3 text-base">
           {mode === "signup" ? "Create account" : "Log in"}
         </Button>
       </form>
 
-      <p className="text-sm text-[var(--muted)]">
+      <p className="texnique-note">
         {mode === "signup" ? "Already have an account?" : "Need an account?"}{" "}
         <Link href={mode === "signup" ? "/login" : "/signup"} className="text-[var(--text)] underline underline-offset-4">
           {mode === "signup" ? "Log in" : "Sign up"}
@@ -120,7 +120,7 @@ function Input({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         autoComplete={autoComplete}
-        className="w-full rounded-[16px] border border-[color:var(--line)] bg-[var(--panel-strong)] px-4 py-3 text-sm text-[var(--text)] outline-none transition focus:border-[color:var(--line-strong)]"
+        className="texnique-field"
       />
     </label>
   );

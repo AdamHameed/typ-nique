@@ -108,6 +108,54 @@ export async function getPersonalLeaderboards(runId: string, limit = 5): Promise
   return result;
 }
 
+export async function getCurrentPersonalLeaderboards(input: {
+  userId: string | null;
+  playerSessionId: string | null;
+  limit?: number;
+}): Promise<PersonalLeaderboardResponse> {
+  const safeLimit = Math.min(Math.max(input.limit ?? 5, 1), 20);
+  const cacheKey = `personal-current:${input.userId ?? "guest"}:${input.playerSessionId ?? "none"}:${safeLimit}`;
+  const cached = getCached<PersonalLeaderboardResponse>(cacheKey);
+
+  if (cached) {
+    return cached;
+  }
+
+  const where: Prisma.GameSessionWhereInput =
+    input.userId
+      ? {
+          status: "COMPLETED",
+          userId: input.userId
+        }
+      : {
+          status: "COMPLETED",
+          playerSessionId: input.playerSessionId ?? "__missing_player_session__"
+        };
+
+  const [bestScores, recentRuns] = await Promise.all([
+    prisma.gameSession.findMany({
+      where,
+      orderBy: [{ totalScore: "desc" }, { endedAt: "asc" }],
+      take: safeLimit
+    }),
+    prisma.gameSession.findMany({
+      where,
+      orderBy: [{ endedAt: "desc" }, { startedAt: "desc" }],
+      take: safeLimit
+    })
+  ]);
+
+  const result: PersonalLeaderboardResponse = {
+    runId: recentRuns[0]?.id ?? (input.userId ? "account-history" : "guest-history"),
+    bestScores: bestScores.map((session) => mapSessionToPersonalRun(session)),
+    recentRuns: recentRuns.map((session) => mapSessionToPersonalRun(session)),
+    guestMode: !input.userId
+  };
+
+  setCached(cacheKey, result);
+  return result;
+}
+
 export function describeLeaderboardStrategy() {
   return {
     apiDesign: [

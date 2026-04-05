@@ -26,13 +26,13 @@ export function AuthControls() {
       <div className="flex items-center gap-2">
         <Link
           href="/login"
-          className="rounded-full border border-[color:var(--line)] px-4 py-2 text-sm font-medium text-[var(--muted)] transition hover:bg-[var(--panel)] hover:text-[var(--text)]"
+          className="texnique-nav-link"
         >
           Log in
         </Link>
         <Link
           href="/signup"
-          className="rounded-full border border-[color:var(--line)] bg-[var(--panel-strong)] px-4 py-2 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--panel)]"
+          className="texnique-nav-link"
         >
           Sign up
         </Link>
@@ -42,7 +42,7 @@ export function AuthControls() {
 
   return (
     <div className="flex items-center gap-2">
-      <span className="text-sm text-[var(--muted)]">{session.user?.displayName ?? session.user?.username}</span>
+      <span className="texnique-nav-link">{session.user?.displayName ?? session.user?.username}</span>
       <button
         type="button"
         disabled={isPending}
@@ -56,7 +56,7 @@ export function AuthControls() {
             });
           })
         }
-        className="rounded-full border border-[color:var(--line)] px-4 py-2 text-sm font-medium text-[var(--muted)] transition hover:bg-[var(--panel)] hover:text-[var(--text)] disabled:opacity-50"
+        className="texnique-nav-link disabled:opacity-50"
       >
         Log out
       </button>

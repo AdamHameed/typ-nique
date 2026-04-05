@@ -46,23 +46,17 @@ export function TypstEditor({
   }, [autoFocusKey, disabled]);
 
   return (
-    <div className="w-full space-y-2">
-      <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-[var(--muted)]">
-        <label htmlFor={editorId} className="font-medium text-[var(--text)]">
-          Editor
+    <div className="texnique-editor">
+      <div className="texnique-editor-meta">
+        <label htmlFor={editorId}>
+          Edit your code here
         </label>
+        <span>{inputMode === "math" ? "No delimiters needed" : "Text mode"}</span>
       </div>
-
-      <div className="rounded-[16px] border border-[color:var(--line)] bg-[var(--panel-strong)] px-3 py-1.5 text-center text-[10px] leading-5 text-[var(--muted)]">
-        {inputMode === "math"
-          ? "Math mode is on for this prompt: you can type x^2 + y^2 = z^2 without wrapping it in $...$."
-          : "Text mode is on for this prompt: write normal Typst text/markup directly. Math delimiters are not needed by default here."}
-      </div>
-
       <textarea
         id={editorId}
         ref={textareaRef}
-        className="min-h-[3.25rem] w-full rounded-[16px] border border-[color:var(--line)] bg-[var(--panel-strong)] p-3 text-center font-[var(--font-mono)] text-base leading-7 text-[var(--text)] outline-none transition placeholder:text-[var(--muted)] focus:border-[color:var(--line-strong)] disabled:cursor-not-allowed disabled:opacity-70"
+        className="texnique-source"
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder="Type the Typst source that recreates the target render..."
@@ -73,9 +67,9 @@ export function TypstEditor({
         autoComplete="off"
       />
 
-      <div className="flex items-center justify-between text-[10px] text-[var(--muted)]">
+      <div className="texnique-editor-meta">
         <span>{value.length} characters</span>
-        <span>{isSubmitting ? "Submitting..." : "Draft autosaves while this round is active."}</span>
+        <span>{isSubmitting ? "Submitting..." : "Draft autosaves during the round."}</span>
       </div>
     </div>
   );

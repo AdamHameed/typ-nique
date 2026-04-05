@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { describeLeaderboardStrategy, getLeaderboard, getPersonalLeaderboards } from "../services/leaderboard-service.js";
+import { ensurePlayerSession, resolveAuthContext } from "../lib/auth.js";
+import { describeLeaderboardStrategy, getCurrentPersonalLeaderboards, getLeaderboard, getPersonalLeaderboards } from "../services/leaderboard-service.js";
 
 const leaderboardQuerySchema = z.object({
   scope: z.enum(["global", "daily", "weekly"]).default("daily"),
@@ -9,6 +10,10 @@ const leaderboardQuerySchema = z.object({
 
 const personalQuerySchema = z.object({
   runId: z.string().uuid(),
+  limit: z.coerce.number().int().min(1).max(20).default(5)
+});
+
+const currentPersonalQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(20).default(5)
 });
 
@@ -50,6 +55,19 @@ export async function leaderboardRoutes(app: FastifyInstance) {
     if (!data) {
       return reply.code(404).send({ error: "Run not found." });
     }
+
+    return { data };
+  });
+
+  app.get("/api/v1/leaderboards/personal/current", async (request, reply) => {
+    const query = currentPersonalQuerySchema.parse(request.query);
+    const auth = await resolveAuthContext(request);
+    const playerSessionId = await ensurePlayerSession(request, reply, auth);
+    const data = await getCurrentPersonalLeaderboards({
+      userId: auth.userId,
+      playerSessionId,
+      limit: query.limit
+    });
 
     return { data };
   });

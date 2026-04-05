@@ -37,10 +37,10 @@ export function ThemeToggle() {
     <button
       type="button"
       onClick={handleToggle}
-      className="rounded-full border border-[color:var(--line)] px-4 py-2 text-sm font-medium text-[var(--muted)] transition hover:bg-[var(--panel)] hover:text-[var(--text)]"
+      className="texnique-nav-link"
       aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
     >
-      {theme === "dark" ? "Light mode" : "Dark mode"}
+      {theme === "dark" ? "Light" : "Dark"}
     </button>
   );
 }

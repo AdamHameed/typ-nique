@@ -1,26 +1,31 @@
 import Link from "next/link";
 import { Button } from "@typ-nique/ui";
+import { featureFlags } from "../lib/features";
 
 export function Hero() {
   return (
-    <section className="flex min-h-[68vh] items-center">
-      <div className="space-y-8">
-        <p className="text-xs uppercase tracking-[0.3em] text-[var(--muted)]">Typst Speed Game</p>
-        <h1 className="max-w-4xl text-5xl font-semibold leading-[1] tracking-tight text-[var(--text)] sm:text-6xl">
-          Rebuild rendered Typst snippets.
-        </h1>
-        <div className="flex flex-wrap gap-3">
-          <Link href="/play">
-            <Button className="px-6 py-3 text-base">Play</Button>
+    <section className="py-8 text-center">
+      <p className="texnique-title">Typ-Nique</p>
+      <p className="texnique-subtitle">A Typst Typesetting Game</p>
+      <p className="mx-auto max-w-2xl text-base leading-7 text-[var(--muted)]">
+        Rebuild rendered Typst snippets from scratch, race the clock, and compare your sessions on shared boards.
+      </p>
+      <div className="mt-8 flex flex-wrap justify-center gap-3">
+        <Link href="/play">
+          <Button className="px-6 py-3 text-base">Play</Button>
+        </Link>
+        {featureFlags.dailyMode ? (
+          <Link href="/daily">
+            <Button className="px-6 py-3 text-base">Daily</Button>
           </Link>
-          <Link
-            href="/leaderboard"
-            className="inline-flex items-center justify-center rounded-full border border-[color:var(--line)] px-6 py-3 text-base font-medium text-[var(--text)] transition hover:bg-[var(--panel)]"
-          >
-            Leaderboard
-          </Link>
-        </div>
+        ) : null}
+        <Link href="/leaderboard">
+          <Button className="px-6 py-3 text-base">Leaderboard</Button>
+        </Link>
       </div>
+      <p className="mx-auto mt-8 max-w-3xl text-sm leading-7 text-[var(--muted)]">
+        Clean math displays, dark-source input, and fast rounds inspired by the original TeXnique feel.
+      </p>
     </section>
   );
 }

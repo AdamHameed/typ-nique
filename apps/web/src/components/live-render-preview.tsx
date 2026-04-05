@@ -4,43 +4,51 @@ import { useEffect, useRef, useState } from "react";
 import type { ChallengeInputMode, PreviewRenderResponse } from "@typ-nique/types";
 import { previewTypstRender } from "../lib/api";
 import { optimizeTypstSvgForSnippet } from "../lib/typst-snippet";
+import { TypstSnippet } from "./typst-snippet";
 
 interface LiveRenderPreviewProps {
   source: string;
   inputMode: ChallengeInputMode;
   enabled?: boolean;
   onPreviewResult?: (result: PreviewRenderResponse | null) => void;
+  shadowSvg?: string | null;
 }
 
 type PreviewState =
   | {
       status: "idle";
       data: null;
-      message: string;
+      errorMessage: null;
     }
   | {
       status: "loading";
       data: PreviewRenderResponse | null;
-      message: string;
+      errorMessage: null;
     }
   | {
       status: "success";
       data: PreviewRenderResponse;
-      message: string;
+      errorMessage: null;
     }
   | {
       status: "error";
       data: PreviewRenderResponse | null;
-      message: string;
+      errorMessage: string;
     };
 
 const PREVIEW_DEBOUNCE_MS = 700;
 
-export function LiveRenderPreview({ source, inputMode, enabled = true, onPreviewResult }: LiveRenderPreviewProps) {
+export function LiveRenderPreview({
+  source,
+  inputMode,
+  enabled = true,
+  onPreviewResult,
+  shadowSvg
+}: LiveRenderPreviewProps) {
   const [state, setState] = useState<PreviewState>({
     status: "idle",
     data: null,
-    message: "Your draft render will appear here once you start typing."
+    errorMessage: null
   });
   const abortRef = useRef<AbortController | null>(null);
 
@@ -51,7 +59,7 @@ export function LiveRenderPreview({ source, inputMode, enabled = true, onPreview
       setState({
         status: "idle",
         data: null,
-        message: "Preview is paused until a challenge is active."
+        errorMessage: null
       });
       return;
     }
@@ -64,7 +72,7 @@ export function LiveRenderPreview({ source, inputMode, enabled = true, onPreview
       setState({
         status: "idle",
         data: null,
-        message: "Your draft render will appear here once you start typing."
+        errorMessage: null
       });
       return;
     }
@@ -76,8 +84,8 @@ export function LiveRenderPreview({ source, inputMode, enabled = true, onPreview
     const timeoutId = window.setTimeout(() => {
       setState((current) => ({
         status: "loading",
-        data: current.data,
-        message: "Rendering preview..."
+        data: current.data?.ok ? current.data : null,
+        errorMessage: null
       }));
 
       void previewTypstRender(trimmed, inputMode, controller.signal)
@@ -88,11 +96,11 @@ export function LiveRenderPreview({ source, inputMode, enabled = true, onPreview
 
           if (!response.ok) {
             onPreviewResult?.(response);
-            setState({
+            setState((current) => ({
               status: "error",
-              data: response,
-              message: response.message ?? "Typst could not render this draft yet."
-            });
+              data: current.data?.ok ? current.data : null,
+              errorMessage: response.message ?? "Render failed."
+            }));
             return;
           }
 
@@ -100,20 +108,20 @@ export function LiveRenderPreview({ source, inputMode, enabled = true, onPreview
           setState({
             status: "success",
             data: response,
-            message: ""
+            errorMessage: null
           });
         })
-        .catch((error) => {
+        .catch(() => {
           if (controller.signal.aborted) {
             return;
           }
 
           onPreviewResult?.(null);
-          setState({
+          setState((current) => ({
             status: "error",
-            data: null,
-            message: error instanceof Error ? error.message : "Preview service is unavailable right now."
-          });
+            data: current.data?.ok ? current.data : null,
+            errorMessage: "Render failed."
+          }));
         });
     }, PREVIEW_DEBOUNCE_MS);
 
@@ -123,29 +131,37 @@ export function LiveRenderPreview({ source, inputMode, enabled = true, onPreview
     };
   }, [enabled, inputMode, onPreviewResult, source]);
 
-  const optimizedPreviewSvg =
-    state.status === "success" && state.data?.svg ? optimizeTypstSvgForSnippet(state.data.svg) : null;
+  const optimizedPreviewSvg = state.data?.ok && state.data.svg ? optimizeTypstSvgForSnippet(state.data.svg) : null;
+  const liveRegionMessage =
+    state.status === "loading"
+      ? "Rendering preview."
+      : state.status === "error"
+        ? state.errorMessage
+        : optimizedPreviewSvg
+          ? "Preview updated."
+          : "";
 
   return (
-    <div className="flex h-full flex-col gap-2">
-      <div className="typst-snippet-frame">
+    <div className="space-y-2">
+      <div className="texnique-math-display texnique-preview-display">
+        {shadowSvg ? (
+          <TypstSnippet svg={shadowSvg} className="texnique-preview-shadow" ariaHidden />
+        ) : null}
+
         {optimizedPreviewSvg ? (
-          <div
-            className="typst-snippet"
-            dangerouslySetInnerHTML={{ __html: optimizedPreviewSvg }}
-          />
-        ) : (
-          <div className="flex min-h-[96px] items-center justify-center rounded-[12px] border border-dashed border-[color:var(--line)] px-4 text-center text-sm leading-6 text-[var(--muted)]">
-            {state.message}
-          </div>
-        )}
+          <TypstSnippet svg={optimizedPreviewSvg} className="texnique-preview-output" />
+        ) : null}
       </div>
 
       {state.status === "error" ? (
-        <div className="rounded-[14px] border border-[color:var(--line)] bg-[var(--panel-strong)] px-3 py-2 text-xs leading-5 text-[var(--text)]">
-          {state.message}
+        <div className="texnique-status texnique-status--error">
+          {state.errorMessage}
         </div>
       ) : null}
+
+      <p className="sr-only" aria-live="polite">
+        {liveRegionMessage}
+      </p>
     </div>
   );
 }

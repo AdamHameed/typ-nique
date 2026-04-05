@@ -39,7 +39,7 @@ export async function createGameSession(mode: "practice" | "daily", actor: Sessi
   const challengeIds =
     mode === "daily"
       ? dailyChallenge?.items.map((item) => item.challengeId) ?? []
-      : shuffle((await getChallengeRotation(30)).map((challenge) => challenge.id));
+      : shuffle((await getChallengeRotation()).map((challenge) => challenge.id));
 
   if (challengeIds.length === 0) {
     throw new Error("No active challenges are available.");
@@ -246,18 +246,24 @@ export async function ensureSessionProgression(sessionId: string) {
     return;
   }
 
-  const challengeIds = getChallengeIds(session.metadata);
+  let challengeIds = getChallengeIds(session.metadata);
   const nextIndex = latestRound.position;
 
   if (nextIndex >= challengeIds.length) {
-    await prisma.gameSession.update({
-      where: { id: sessionId },
-      data: {
-        status: "COMPLETED",
-        endedAt: new Date()
-      }
-    });
-    return;
+    if (session.mode === "PRACTICE") {
+      challengeIds = await extendPracticeChallengeIds(session.id, session.metadata, challengeIds);
+    }
+
+    if (nextIndex >= challengeIds.length) {
+      await prisma.gameSession.update({
+        where: { id: sessionId },
+        data: {
+          status: "COMPLETED",
+          endedAt: new Date()
+        }
+      });
+      return;
+    }
   }
 
   const nextRoundExists = await prisma.gameRound.findFirst({
@@ -478,6 +484,35 @@ function getChallengeIds(metadata: Prisma.JsonValue): string[] {
 
   const challengeIds = (metadata as { challengeIds?: unknown }).challengeIds;
   return Array.isArray(challengeIds) ? challengeIds.filter((value): value is string => typeof value === "string") : [];
+}
+
+async function extendPracticeChallengeIds(sessionId: string, existingMetadata: Prisma.JsonValue, existingChallengeIds: string[]) {
+  const nextCycle = shuffle((await getChallengeRotation()).map((challenge) => challenge.id));
+
+  if (nextCycle.length === 0) {
+    return existingChallengeIds;
+  }
+
+  // Avoid an immediate repeat when the next cycle begins, if we have any alternative.
+  if (existingChallengeIds.length > 0 && nextCycle.length > 1 && nextCycle[0] === existingChallengeIds.at(-1)) {
+    nextCycle.push(nextCycle.shift()!);
+  }
+
+  const challengeIds = [...existingChallengeIds, ...nextCycle];
+  const metadata =
+    existingMetadata && typeof existingMetadata === "object" && !Array.isArray(existingMetadata) ? existingMetadata : {};
+
+  await prisma.gameSession.update({
+    where: { id: sessionId },
+    data: {
+      metadata: {
+        ...metadata,
+        challengeIds
+      }
+    }
+  });
+
+  return challengeIds;
 }
 
 function shuffle<T>(items: T[]): T[] {
