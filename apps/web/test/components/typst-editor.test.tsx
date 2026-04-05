@@ -10,16 +10,16 @@ describe("TypstEditor", () => {
 
     render(<TypstEditor value="" onChange={onChange} inputMode="math" />);
 
-    expect(screen.getByText(/Math mode is on/i)).toBeInTheDocument();
+    expect(screen.getByText(/No delimiters needed/i)).toBeInTheDocument();
 
-    await user.type(screen.getByRole("textbox", { name: /editor/i }), "x^2 + y^2 = z^2");
+    await user.type(screen.getByRole("textbox", { name: /edit your code here/i }), "x^2 + y^2 = z^2");
 
     expect(onChange).toHaveBeenCalled();
   });
 
   it("shows text-mode guidance", () => {
     render(<TypstEditor value="#strong[Hello]" onChange={() => {}} inputMode="text" />);
-    expect(screen.getByText(/Text mode is on/i)).toBeInTheDocument();
+    expect(screen.getByText(/^Text mode$/i)).toBeInTheDocument();
     expect(screen.getByText(/14 characters/i)).toBeInTheDocument();
   });
 });

@@ -46,7 +46,7 @@ describe("ResultsOverview", () => {
       />
     );
 
-    expect(screen.getByText("Run Summary")).toBeInTheDocument();
+    expect(screen.getByText("Run summary")).toBeInTheDocument();
     expect(screen.getByText("380")).toBeInTheDocument();
     expect(screen.getByText("Matrix Row Swap")).toBeInTheDocument();
     expect(screen.getByText(/220 points/i)).toBeInTheDocument();
