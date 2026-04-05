@@ -41,6 +41,7 @@
     "docker:build:web": "docker build -f infra/docker/web.Dockerfile -t typ-nique-web:ci .",
     "docker:build:worker": "docker build -f infra/docker/worker.Dockerfile -t typ-nique-worker:ci .",
     "docker:build": "pnpm docker:build:api && pnpm docker:build:web && pnpm docker:build:worker",
+    "ci:prepare": "pnpm db:generate",
     "ci:lint": "pnpm lint",
     "ci:typecheck": "pnpm typecheck",
     "ci:test:unit": "pnpm test:checker && pnpm test:api:unit && pnpm test:web",
