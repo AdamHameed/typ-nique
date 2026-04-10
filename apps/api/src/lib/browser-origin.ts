@@ -25,3 +25,11 @@ export function isAllowedBrowserOrigin(origin: string | undefined, allowedOrigin
     return false;
   }
 }
+
+export function isAllowedWebSocketOrigin(origin: string | undefined, allowedOrigins: string[]) {
+  if (!origin) {
+    return false;
+  }
+
+  return isAllowedBrowserOrigin(origin, allowedOrigins);
+}

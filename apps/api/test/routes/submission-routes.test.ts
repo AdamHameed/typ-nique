@@ -12,10 +12,14 @@ vi.mock("../../src/lib/auth.js", () => ({
   resolveAuthContext: mocks.resolveAuthContext
 }));
 
-vi.mock("../../src/lib/rate-limit.js", () => ({
-  buildRateLimitKey: mocks.buildRateLimitKey,
-  checkRateLimit: mocks.checkRateLimit
-}));
+vi.mock("../../src/lib/rate-limit.js", async () => {
+  const actual = await vi.importActual<typeof import("../../src/lib/rate-limit.js")>("../../src/lib/rate-limit.js");
+  return {
+    ...actual,
+    buildRateLimitKey: mocks.buildRateLimitKey,
+    checkRateLimit: mocks.checkRateLimit
+  };
+});
 
 vi.mock("../../src/lib/env.js", () => ({
   env: {

@@ -3,15 +3,21 @@ import type { PreviewRenderResponse } from "@typ-nique/types";
 import { toRenderableTypstSourceForMode } from "@typ-nique/checker";
 import { previewRenderSchema } from "@typ-nique/validation";
 import { env } from "../lib/env.js";
+import { logSecurityEvent } from "../lib/security-log.js";
 import { matchesSecret } from "../lib/secrets.js";
 import { renderSubmission } from "../renderer/service.js";
 
 export async function previewRoutes(app: FastifyInstance) {
   app.post("/internal/render/preview", async (request, reply) => {
     if (!isAuthorizedInternalRequest(request.headers["x-worker-internal-token"])) {
+      logSecurityEvent("worker-preview-auth-rejected", {
+        requestId: request.id,
+        ip: request.ip
+      });
+
       return reply.code(401).send({
         ok: false,
-        errorCode: "INTERNAL_ERROR",
+        errorCode: "UNAUTHORIZED",
         message: "Unauthorized."
       } satisfies PreviewRenderResponse);
     }

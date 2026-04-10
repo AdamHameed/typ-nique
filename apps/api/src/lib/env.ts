@@ -1,3 +1,4 @@
+import { parseServiceEnv } from "@typ-nique/validation";
 import { z } from "zod";
 import { parseAllowedBrowserOrigins } from "./browser-origin.js";
 
@@ -43,6 +44,8 @@ const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: optionalNumber,
   API_PORT: z.coerce.number().default(4000),
+  API_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120000).default(15000),
+  API_BODY_LIMIT_BYTES: z.coerce.number().int().min(1024).max(131072).default(16 * 1024),
   DATABASE_URL: z.string().min(1),
   WORKER_RENDER_URL: optionalUrl,
   WORKER_INTERNAL_TOKEN: z.string().min(1).optional(),
@@ -56,13 +59,24 @@ const envSchema = z.object({
   ALLOWED_BROWSER_ORIGINS: optionalString,
   ENABLE_MULTIPLAYER_DIAGNOSTICS: optionalBoolean,
   AUTH_SESSION_TTL_DAYS: z.coerce.number().int().min(1).max(365).default(30),
+  AUTH_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1000).default(60000),
+  AUTH_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(10),
+  LEADERBOARD_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1000).default(60000),
+  LEADERBOARD_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(120),
+  MULTIPLAYER_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1000).default(60000),
+  MULTIPLAYER_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(90),
+  MULTIPLAYER_WS_CONNECTION_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1000).default(60000),
+  MULTIPLAYER_WS_CONNECTION_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(24),
+  MULTIPLAYER_WS_MESSAGE_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1000).default(10000),
+  MULTIPLAYER_WS_MESSAGE_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(60),
+  WEBSOCKET_MAX_PAYLOAD_BYTES: z.coerce.number().int().min(512).max(65536).default(4096),
   PREVIEW_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1000).default(60000),
   PREVIEW_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(45),
   SUBMISSION_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1000).default(60000),
   SUBMISSION_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(90)
 });
 
-const parsedEnv = envSchema.parse(process.env);
+const parsedEnv = parseServiceEnv("api", envSchema, process.env);
 const defaultWorkerRenderUrl = parsedEnv.NODE_ENV === "production" ? undefined : "http://127.0.0.1:4100";
 const workerRenderUrl = parsedEnv.WORKER_RENDER_URL ?? defaultWorkerRenderUrl;
 const authCookieSecure = parsedEnv.AUTH_COOKIE_SECURE ?? parsedEnv.NODE_ENV === "production";
@@ -81,8 +95,16 @@ if (parsedEnv.NODE_ENV === "production" && !parsedEnv.WORKER_INTERNAL_TOKEN) {
   throw new Error("WORKER_INTERNAL_TOKEN must be set in production.");
 }
 
+if (parsedEnv.NODE_ENV === "production" && allowedBrowserOrigins.length === 0) {
+  throw new Error("ALLOWED_BROWSER_ORIGINS must be set in production.");
+}
+
 if (parsedEnv.NODE_ENV === "production" && !authCookieSecure) {
   throw new Error("AUTH_COOKIE_SECURE must be true in production.");
+}
+
+if (parsedEnv.AUTH_COOKIE_NAME === parsedEnv.GUEST_COOKIE_NAME) {
+  throw new Error("AUTH_COOKIE_NAME and GUEST_COOKIE_NAME must be different.");
 }
 
 export const env = {

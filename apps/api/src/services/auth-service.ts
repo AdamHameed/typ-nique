@@ -34,7 +34,7 @@ export async function authenticateUser(input: { identifier: string; password: st
   });
 
   if (!user || !verifyPassword(input.password, user.passwordHash)) {
-    throw new Error("Invalid email, username, or password.");
+    throw new Error("Invalid username or password.");
   }
 
   return user;

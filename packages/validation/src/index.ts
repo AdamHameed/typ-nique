@@ -1,5 +1,31 @@
 import { z } from "zod";
 
+export function parseServiceEnv<TSchema extends z.ZodTypeAny>(
+  service: string,
+  schema: TSchema,
+  source: Record<string, string | undefined>
+) {
+  const parsed = schema.safeParse(source);
+
+  if (parsed.success) {
+    return parsed.data;
+  }
+
+  console.error(
+    JSON.stringify({
+      category: "startup",
+      event: "invalid-env",
+      service,
+      issues: parsed.error.issues.map((issue) => ({
+        path: issue.path.join(".") || "<root>",
+        message: issue.message
+      }))
+    })
+  );
+
+  throw new Error(`Invalid ${service} environment configuration.`);
+}
+
 export const createGameSessionSchema = z.object({
   mode: z.enum(["practice", "daily"]).default("practice")
 });

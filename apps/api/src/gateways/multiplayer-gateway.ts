@@ -6,7 +6,7 @@ import { z } from "zod";
 import { WebSocketServer } from "ws";
 import type WebSocket from "ws";
 import { buildRateLimitKey, checkRateLimit } from "../lib/rate-limit.js";
-import { isAllowedBrowserOrigin } from "../lib/browser-origin.js";
+import { isAllowedWebSocketOrigin } from "../lib/browser-origin.js";
 import { env } from "../lib/env.js";
 import { logSecurityEvent, sanitizeMultiplayerClientError } from "../lib/security-observability.js";
 import { prisma } from "../lib/prisma.js";
@@ -85,17 +85,41 @@ interface GatewayConnectionContext {
 const gatewayConnections = new Map<string, GatewayConnectionContext>();
 
 export function registerMultiplayerGateway(app: FastifyInstance) {
-  const wss = new WebSocketServer({ noServer: true });
+  const wss = new WebSocketServer({
+    noServer: true,
+    maxPayload: env.WEBSOCKET_MAX_PAYLOAD_BYTES
+  });
 
   app.server.on("upgrade", async (request, socket, head) => {
     const pathname = extractPathname(request);
+    const ip = extractClientIp(request);
 
     if (pathname !== GATEWAY_PATH) {
       return;
     }
 
-    if (!isAllowedBrowserOrigin(request.headers.origin, env.ALLOWED_BROWSER_ORIGINS)) {
+    if (!isAllowedWebSocketOrigin(request.headers.origin, env.ALLOWED_BROWSER_ORIGINS)) {
+      logSecurityEvent("multiplayer-ws-origin-rejected", {
+        ip,
+        origin: request.headers.origin ?? null
+      });
       socket.write("HTTP/1.1 403 Forbidden\r\n\r\n");
+      socket.destroy();
+      return;
+    }
+
+    const connectionLimiter = checkRateLimit(
+      buildRateLimitKey("multiplayer-ws-connect", null, ip),
+      env.MULTIPLAYER_WS_CONNECTION_RATE_LIMIT_MAX,
+      env.MULTIPLAYER_WS_CONNECTION_RATE_LIMIT_WINDOW_MS
+    );
+
+    if (!connectionLimiter.allowed) {
+      logSecurityEvent("multiplayer-ws-connection-rate-limit-exceeded", {
+        ip,
+        origin: request.headers.origin ?? null
+      });
+      socket.write(`HTTP/1.1 429 Too Many Requests\r\nRetry-After: ${Math.max(1, Math.ceil((connectionLimiter.resetsAt - Date.now()) / 1000))}\r\n\r\n`);
       socket.destroy();
       return;
     }
@@ -104,6 +128,10 @@ export function registerMultiplayerGateway(app: FastifyInstance) {
       const actor = await resolveAuthContextFromHeaders(request.headers);
 
       if (!actor.playerSessionId) {
+        logSecurityEvent("multiplayer-ws-auth-rejected", {
+          ip,
+          origin: request.headers.origin ?? null
+        });
         socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
         socket.destroy();
         return;
@@ -167,6 +195,30 @@ function wireGatewayConnection(connection: GatewayConnectionContext) {
 }
 
 async function handleClientMessage(connection: GatewayConnectionContext, raw: string) {
+  const limiter = checkRateLimit(
+    buildRateLimitKey("multiplayer-ws-message", connection.actor.userId ?? connection.actor.playerSessionId, connection.id),
+    env.MULTIPLAYER_WS_MESSAGE_RATE_LIMIT_MAX,
+    env.MULTIPLAYER_WS_MESSAGE_RATE_LIMIT_WINDOW_MS
+  );
+
+  if (!limiter.allowed) {
+    logSecurityEvent("multiplayer-ws-message-rate-limit-exceeded", {
+      roomId: connection.roomId,
+      actor: {
+        userId: connection.actor.userId,
+        playerSessionId: connection.actor.playerSessionId
+      }
+    });
+
+    try {
+      connection.socket.close(4008, "Rate limit exceeded");
+    } catch {
+      // no-op
+    }
+
+    return;
+  }
+
   let message: z.infer<typeof clientEventSchema>;
 
   try {
@@ -327,6 +379,16 @@ async function getRoomVersion(roomId: string) {
 function extractPathname(request: IncomingMessage) {
   const url = new URL(request.url ?? "/", "http://localhost");
   return url.pathname;
+}
+
+function extractClientIp(request: IncomingMessage) {
+  const forwardedFor = request.headers["x-forwarded-for"];
+
+  if (typeof forwardedFor === "string" && forwardedFor.trim()) {
+    return forwardedFor.split(",")[0]?.trim() ?? "unknown";
+  }
+
+  return request.socket.remoteAddress ?? "unknown";
 }
 
 async function buildReconnectSnapshotPayload(

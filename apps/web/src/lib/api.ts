@@ -14,9 +14,9 @@ import type {
   PreviewRenderResponse,
   SubmissionOutcome
 } from "@typ-nique/types";
+import { isProduction, publicEnv } from "./public-env";
 
-const isProduction = process.env.NODE_ENV === "production";
-const configuredBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? (isProduction ? undefined : "http://localhost:4000");
+const configuredBaseUrl = publicEnv.NEXT_PUBLIC_API_URL;
 const internalBaseUrl =
   process.env.API_INTERNAL_URL ??
   configuredBaseUrl?.replace("://localhost", "://127.0.0.1") ??
@@ -284,7 +284,7 @@ export async function getMultiplayerRoomResults(matchId: string, includeDiagnost
 }
 
 export function getMultiplayerGatewayUrl() {
-  const configuredGatewayBaseUrl = process.env.NEXT_PUBLIC_MULTIPLAYER_GATEWAY_URL ?? configuredBaseUrl;
+  const configuredGatewayBaseUrl = publicEnv.NEXT_PUBLIC_MULTIPLAYER_GATEWAY_URL ?? configuredBaseUrl;
 
   if (configuredGatewayBaseUrl) {
     return `${configuredGatewayBaseUrl.replace(/^http/, "ws")}/api/v1/multiplayer/ws`;

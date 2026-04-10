@@ -1,4 +1,3 @@
-const isProduction = process.env.NODE_ENV === "production";
+import { publicEnv } from "./public-env";
 
-export const multiplayerDiagnosticsEnabled =
-  process.env.NEXT_PUBLIC_ENABLE_MULTIPLAYER_DIAGNOSTICS === "true" || !isProduction;
+export const multiplayerDiagnosticsEnabled = publicEnv.NEXT_PUBLIC_ENABLE_MULTIPLAYER_DIAGNOSTICS;

@@ -1,17 +1,20 @@
 import type { NextRequest } from "next/server";
+import { getServerEnv, isProduction, publicEnv } from "../../../../lib/env";
 
 export const dynamic = "force-dynamic";
 
 function resolveApiOrigin() {
-  if (process.env.API_INTERNAL_URL) {
-    return process.env.API_INTERNAL_URL;
+  const serverEnv = getServerEnv();
+
+  if (serverEnv.API_INTERNAL_URL) {
+    return serverEnv.API_INTERNAL_URL;
   }
 
-  if (process.env.NEXT_PUBLIC_API_URL) {
-    return process.env.NEXT_PUBLIC_API_URL;
+  if (publicEnv.NEXT_PUBLIC_API_URL) {
+    return publicEnv.NEXT_PUBLIC_API_URL;
   }
 
-  if (process.env.NODE_ENV !== "production") {
+  if (!isProduction) {
     return "http://127.0.0.1:4000";
   }
 
@@ -26,19 +29,30 @@ async function proxyRequest(request: NextRequest, path: string[]) {
   headers.delete("connection");
   headers.delete("content-length");
 
-  const upstream = await fetch(targetUrl, {
-    method: request.method,
-    headers,
-    body: request.method === "GET" || request.method === "HEAD" ? undefined : await request.arrayBuffer(),
-    cache: "no-store",
-    redirect: "manual"
-  });
+  try {
+    const upstream = await fetch(targetUrl, {
+      method: request.method,
+      headers,
+      body: request.method === "GET" || request.method === "HEAD" ? undefined : await request.arrayBuffer(),
+      cache: "no-store",
+      redirect: "manual",
+      signal: AbortSignal.timeout(10_000)
+    });
 
-  return new Response(upstream.body, {
-    status: upstream.status,
-    statusText: upstream.statusText,
-    headers: upstream.headers
-  });
+    return new Response(upstream.body, {
+      status: upstream.status,
+      statusText: upstream.statusText,
+      headers: upstream.headers
+    });
+  } catch {
+    return new Response(JSON.stringify({ error: "API upstream unavailable." }), {
+      status: 503,
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-store"
+      }
+    });
+  }
 }
 
 async function resolvePath(params: Promise<{ path: string[] }>) {

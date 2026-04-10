@@ -1,6 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { ensurePlayerSession, resolveAuthContext } from "../lib/auth.js";
+import { env } from "../lib/env.js";
+import { applyRateLimitHeaders, buildRateLimitKey, checkRateLimit } from "../lib/rate-limit.js";
+import { logSecurityEvent } from "../lib/security-observability.js";
 import { describeLeaderboardStrategy, getCurrentPersonalLeaderboards, getLeaderboard, getPersonalLeaderboards } from "../services/leaderboard-service.js";
 
 const leaderboardQuerySchema = z.object({
@@ -17,28 +20,33 @@ const currentPersonalQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(20).default(5)
 });
 
-const rateLimitWindowMs = 60_000;
-const rateLimitMaxRequests = 120;
-const requestLog = new Map<string, number[]>();
-
 export async function leaderboardRoutes(app: FastifyInstance) {
   app.addHook("onRequest", async (request, reply) => {
     if (!request.url.startsWith("/api/v1/leaderboards") && !request.url.startsWith("/api/v1/leaderboard")) {
       return;
     }
 
-    const key = request.ip;
-    const now = Date.now();
-    const recent = (requestLog.get(key) ?? []).filter((timestamp) => now - timestamp < rateLimitWindowMs);
+    const limiter = checkRateLimit(
+      buildRateLimitKey("leaderboard", null, request.ip),
+      env.LEADERBOARD_RATE_LIMIT_MAX,
+      env.LEADERBOARD_RATE_LIMIT_WINDOW_MS
+    );
+    applyRateLimitHeaders(reply, limiter, {
+      limit: env.LEADERBOARD_RATE_LIMIT_MAX,
+      windowMs: env.LEADERBOARD_RATE_LIMIT_WINDOW_MS
+    });
 
-    if (recent.length >= rateLimitMaxRequests) {
+    if (!limiter.allowed) {
+      logSecurityEvent("leaderboard-rate-limit-exceeded", {
+        requestId: request.id,
+        ip: request.ip,
+        path: request.url
+      }, "info");
+
       return reply.code(429).send({
         error: "Too many leaderboard requests. Please slow down."
       });
     }
-
-    recent.push(now);
-    requestLog.set(key, recent);
   });
 
   app.get("/api/v1/leaderboards", async (request) => {

@@ -134,4 +134,5 @@ docker compose -f infra/compose/docker-compose.dev.yml run --rm setup
 - [Challenge content system](/Users/adam/Downloads/Projects/typ-nique/docs/challenge-content-system.md)
 - [Typst rendering service](/Users/adam/Downloads/Projects/typ-nique/docs/typst-rendering-service.md)
 - [Advanced answer checker](/Users/adam/Downloads/Projects/typ-nique/docs/advanced-answer-checker.md)
+- [Production security hardening](/Users/adam/Downloads/Projects/typ-nique/docs/production-security.md)
 - [Railway deployment](/Users/adam/Downloads/Projects/typ-nique/docs/railway-deployment.md)

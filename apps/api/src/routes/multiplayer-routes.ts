@@ -9,6 +9,8 @@ import {
 } from "@typ-nique/validation";
 import { ensurePlayerSession, resolveAuthContext } from "../lib/auth.js";
 import { env } from "../lib/env.js";
+import { applyRateLimitHeaders, buildRateLimitKey, checkRateLimit } from "../lib/rate-limit.js";
+import { logSecurityEvent } from "../lib/security-observability.js";
 import {
   createMultiplayerRoom,
   getMultiplayerRoomByCode,
@@ -24,6 +26,35 @@ import {
 } from "../services/multiplayer-service.js";
 
 export async function multiplayerRoutes(app: FastifyInstance) {
+  app.addHook("onRequest", async (request, reply) => {
+    if (!request.url.startsWith("/api/v1/multiplayer/") || request.method === "GET") {
+      return;
+    }
+
+    const limiter = checkRateLimit(
+      buildRateLimitKey("multiplayer", null, request.ip),
+      env.MULTIPLAYER_RATE_LIMIT_MAX,
+      env.MULTIPLAYER_RATE_LIMIT_WINDOW_MS
+    );
+    applyRateLimitHeaders(reply, limiter, {
+      limit: env.MULTIPLAYER_RATE_LIMIT_MAX,
+      windowMs: env.MULTIPLAYER_RATE_LIMIT_WINDOW_MS
+    });
+
+    if (!limiter.allowed) {
+      logSecurityEvent("multiplayer-http-rate-limit-exceeded", {
+        requestId: request.id,
+        ip: request.ip,
+        method: request.method,
+        path: request.url
+      }, "info");
+
+      return reply.code(429).send({
+        error: "Too many multiplayer requests. Please slow down and try again."
+      });
+    }
+  });
+
   app.post("/api/v1/multiplayer/rooms", async (request, reply) => {
     const body = createMultiplayerRoomSchema.parse(request.body);
     const auth = await resolveAuthContext(request);

@@ -1,3 +1,4 @@
+import { parseServiceEnv } from "@typ-nique/validation";
 import { z } from "zod";
 
 const optionalNumber = z.preprocess((value) => {
@@ -26,6 +27,8 @@ const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: optionalNumber,
   WORKER_PORT: z.coerce.number().default(4100),
+  WORKER_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120000).default(15000),
+  WORKER_BODY_LIMIT_BYTES: z.coerce.number().int().min(1024).max(131072).default(16 * 1024),
   REDIS_URL: z.string().min(1),
   QUEUE_NAME: z.string().default("render-jobs"),
   WORKER_INTERNAL_TOKEN: z.string().min(1).optional(),
@@ -45,10 +48,22 @@ const envSchema = z.object({
   RENDER_CACHE_MAX_ENTRIES: z.coerce.number().int().min(10).max(5000).default(500)
 });
 
-const parsedEnv = envSchema.parse(process.env);
+const parsedEnv = parseServiceEnv("worker", envSchema, process.env);
 
 if (parsedEnv.NODE_ENV === "production" && !parsedEnv.WORKER_INTERNAL_TOKEN) {
   throw new Error("WORKER_INTERNAL_TOKEN must be set in production.");
+}
+
+if (parsedEnv.ENABLE_RENDER_ADMIN && !parsedEnv.RENDER_ADMIN_TOKEN) {
+  throw new Error("RENDER_ADMIN_TOKEN must be set when ENABLE_RENDER_ADMIN is true.");
+}
+
+if (
+  parsedEnv.WORKER_INTERNAL_TOKEN &&
+  parsedEnv.RENDER_ADMIN_TOKEN &&
+  parsedEnv.WORKER_INTERNAL_TOKEN === parsedEnv.RENDER_ADMIN_TOKEN
+) {
+  throw new Error("RENDER_ADMIN_TOKEN must be different from WORKER_INTERNAL_TOKEN.");
 }
 
 export const env = {
