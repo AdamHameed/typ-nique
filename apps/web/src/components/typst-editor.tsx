@@ -6,6 +6,8 @@ import type { ChallengeInputMode } from "@typ-nique/types";
 interface TypstEditorProps {
   value: string;
   onChange: (value: string) => void;
+  onSubmit?: () => void;
+  onSkip?: () => void;
   inputMode: ChallengeInputMode;
   disabled?: boolean;
   isSubmitting?: boolean;
@@ -15,6 +17,8 @@ interface TypstEditorProps {
 export function TypstEditor({
   value,
   onChange,
+  onSubmit,
+  onSkip,
   inputMode,
   disabled = false,
   isSubmitting = false,
@@ -59,6 +63,22 @@ export function TypstEditor({
         className="texnique-source"
         value={value}
         onChange={(event) => onChange(event.target.value)}
+        onKeyDown={(event) => {
+          if (disabled || isSubmitting) {
+            return;
+          }
+
+          if (event.key === "Enter" && !event.shiftKey) {
+            event.preventDefault();
+            onSubmit?.();
+            return;
+          }
+
+          if (event.key === "Enter" && event.shiftKey) {
+            event.preventDefault();
+            onSkip?.();
+          }
+        }}
         placeholder="Type the Typst source that recreates the target render..."
         disabled={disabled}
         spellCheck={false}
@@ -69,7 +89,7 @@ export function TypstEditor({
 
       <div className="texnique-editor-meta">
         <span>{value.length} characters</span>
-        <span>{isSubmitting ? "Submitting..." : "Draft autosaves during the round."}</span>
+        <span>{isSubmitting ? "Submitting..." : "Enter submits · Shift+Enter skips"}</span>
       </div>
     </div>
   );

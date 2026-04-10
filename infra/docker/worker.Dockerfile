@@ -1,6 +1,8 @@
 FROM rust:1-bookworm AS typst-builder
 
-RUN cargo install typst-cli --locked
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+  --mount=type=cache,target=/usr/local/cargo/git \
+  cargo install typst-cli --version 0.14.2 --locked
 
 FROM node:22-bookworm-slim AS base
 

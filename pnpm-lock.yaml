@@ -107,6 +107,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@typ-nique/checker':
+        specifier: workspace:*
+        version: link:../../packages/checker
       '@typ-nique/types':
         specifier: workspace:*
         version: link:../../packages/types

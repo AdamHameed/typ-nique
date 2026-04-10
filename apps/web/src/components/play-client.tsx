@@ -252,18 +252,29 @@ export function PlayClient({ mode = "practice" }: { mode?: "practice" | "daily" 
   }, [session?.id, session?.currentRound?.roundId, source]);
 
   useEffect(() => {
-    if (!session?.currentRound || !latestPreview?.ok || !latestPreview.renderHash || isPending) {
+    const currentRound = session?.currentRound;
+
+    if (!currentRound || !latestPreview?.ok || isPending) {
       return;
     }
 
-    const targetHash = session.currentRound.challenge.renderHash;
     const trimmedSource = source.trim();
 
-    if (!targetHash || !trimmedSource || latestPreview.renderHash !== targetHash) {
+    if (!trimmedSource) {
       return;
     }
 
-    const autoSubmitKey = `${session.id}:${session.currentRound.roundId}:${trimmedSource}:${latestPreview.renderHash}`;
+    const hashMatches =
+      Boolean(currentRound.challenge.renderHash) &&
+      Boolean(latestPreview.renderHash) &&
+      latestPreview.renderHash === currentRound.challenge.renderHash;
+    const serverMatched = latestPreview.matchesTarget === true;
+
+    if (!hashMatches && !serverMatched) {
+      return;
+    }
+
+    const autoSubmitKey = `${session.id}:${currentRound.roundId}:${trimmedSource}:${latestPreview.matchTier ?? latestPreview.renderHash ?? "match"}`;
 
     if (autoSubmitKeyRef.current === autoSubmitKey) {
       return;
@@ -271,7 +282,7 @@ export function PlayClient({ mode = "practice" }: { mode?: "practice" | "daily" 
 
     autoSubmitKeyRef.current = autoSubmitKey;
     handleSubmit();
-  }, [isPending, latestPreview, session?.currentRound?.challenge.renderHash, session?.currentRound?.roundId, session?.id, source]);
+  }, [isPending, latestPreview, session?.currentRound, session?.id, source]);
 
   const current = session?.currentRound;
   const optimizedTargetSvg = current?.challenge.renderedSvg
@@ -354,6 +365,8 @@ export function PlayClient({ mode = "practice" }: { mode?: "practice" | "daily" 
         <LiveRenderPreview
           source={source}
           inputMode={current?.challenge.inputMode ?? "math"}
+          sessionId={session?.id}
+          roundId={current?.roundId}
           enabled={Boolean(current) && !isPending}
           onPreviewResult={setLatestPreview}
           shadowSvg={optimizedTargetSvg}
@@ -362,6 +375,8 @@ export function PlayClient({ mode = "practice" }: { mode?: "practice" | "daily" 
         <TypstEditor
           value={source}
           onChange={setSource}
+          onSubmit={handleSubmit}
+          onSkip={handleSkip}
           inputMode={current?.challenge.inputMode ?? "math"}
           disabled={!current || isPending}
           isSubmitting={isPending}

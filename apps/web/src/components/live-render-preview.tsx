@@ -9,6 +9,8 @@ import { TypstSnippet } from "./typst-snippet";
 interface LiveRenderPreviewProps {
   source: string;
   inputMode: ChallengeInputMode;
+  sessionId?: string;
+  roundId?: string;
   enabled?: boolean;
   onPreviewResult?: (result: PreviewRenderResponse | null) => void;
   shadowSvg?: string | null;
@@ -41,6 +43,8 @@ const PREVIEW_DEBOUNCE_MS = 700;
 export function LiveRenderPreview({
   source,
   inputMode,
+  sessionId,
+  roundId,
   enabled = true,
   onPreviewResult,
   shadowSvg
@@ -88,7 +92,7 @@ export function LiveRenderPreview({
         errorMessage: null
       }));
 
-      void previewTypstRender(trimmed, inputMode, controller.signal)
+      void previewTypstRender(trimmed, inputMode, controller.signal, { sessionId, roundId })
         .then((response) => {
           if (controller.signal.aborted) {
             return;
@@ -129,7 +133,7 @@ export function LiveRenderPreview({
       window.clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [enabled, inputMode, onPreviewResult, source]);
+  }, [enabled, inputMode, onPreviewResult, roundId, sessionId, source]);
 
   const optimizedPreviewSvg = state.data?.ok && state.data.svg ? optimizeTypstSvgForSnippet(state.data.svg) : null;
   const liveRegionMessage =

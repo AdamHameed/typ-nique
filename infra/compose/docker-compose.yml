@@ -1,3 +1,5 @@
+name: ${COMPOSE_PROJECT_NAME:-typnique}
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -30,6 +32,39 @@ services:
       retries: 10
       start_period: 5s
 
+  setup:
+    build:
+      context: ../..
+      dockerfile: infra/docker/api.dev.Dockerfile
+    env_file:
+      - ../../.env
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/typ_nique
+      DIRECT_DATABASE_URL: postgresql://postgres:postgres@postgres:5432/typ_nique
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >-
+      sh -lc
+      "pnpm --filter @typ-nique/db run generate
+      && pnpm --filter @typ-nique/db run deploy
+      && pnpm --filter @typ-nique/db run seed"
+    restart: "no"
+    volumes:
+      - ../..:/app
+      - api_node_modules:/app/node_modules
+      - api_app_node_modules:/app/apps/api/node_modules
+      - web_app_node_modules:/app/apps/web/node_modules
+      - worker_app_node_modules:/app/apps/worker/node_modules
+      - prisma_node_modules:/app/prisma/node_modules
+      - type: volume
+        source: pnpm_store
+        target: /pnpm
+        volume:
+          nocopy: true
+
   api:
     build:
       context: ../..
@@ -48,10 +83,20 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      setup:
+        condition: service_completed_successfully
     volumes:
       - ../..:/app
       - api_node_modules:/app/node_modules
-      - pnpm_store:/pnpm
+      - api_app_node_modules:/app/apps/api/node_modules
+      - web_app_node_modules:/app/apps/web/node_modules
+      - worker_app_node_modules:/app/apps/worker/node_modules
+      - prisma_node_modules:/app/prisma/node_modules
+      - type: volume
+        source: pnpm_store
+        target: /pnpm
+        volume:
+          nocopy: true
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 10s
@@ -76,6 +121,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      setup:
+        condition: service_completed_successfully
     mem_limit: 768m
     cpus: 1.0
     pids_limit: 128
@@ -84,7 +131,15 @@ services:
     volumes:
       - ../..:/app
       - worker_node_modules:/app/node_modules
-      - pnpm_store:/pnpm
+      - api_app_node_modules:/app/apps/api/node_modules
+      - web_app_node_modules:/app/apps/web/node_modules
+      - worker_app_node_modules:/app/apps/worker/node_modules
+      - prisma_node_modules:/app/prisma/node_modules
+      - type: volume
+        source: pnpm_store
+        target: /pnpm
+        volume:
+          nocopy: true
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4100/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 10s
@@ -109,7 +164,15 @@ services:
     volumes:
       - ../..:/app
       - web_node_modules:/app/node_modules
-      - pnpm_store:/pnpm
+      - api_app_node_modules:/app/apps/api/node_modules
+      - web_app_node_modules:/app/apps/web/node_modules
+      - worker_app_node_modules:/app/apps/worker/node_modules
+      - prisma_node_modules:/app/prisma/node_modules
+      - type: volume
+        source: pnpm_store
+        target: /pnpm
+        volume:
+          nocopy: true
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 10s
@@ -124,3 +187,7 @@ volumes:
   api_node_modules:
   worker_node_modules:
   web_node_modules:
+  api_app_node_modules:
+  web_app_node_modules:
+  worker_app_node_modules:
+  prisma_node_modules:

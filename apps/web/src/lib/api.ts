@@ -109,13 +109,27 @@ export async function getSessionResults(sessionId: string) {
   return fetchJson<{ data: GameSessionResult }>(`/api/v1/game-sessions/${sessionId}/results`);
 }
 
-export async function previewTypstRender(source: string, inputMode: ChallengeInputMode, signal?: AbortSignal) {
+export async function previewTypstRender(
+  source: string,
+  inputMode: ChallengeInputMode,
+  signal?: AbortSignal,
+  context?: { sessionId?: string; roundId?: string }
+) {
   const response = await fetch(`${baseUrl}/api/v1/render/preview`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({ source, inputMode }),
+    body: JSON.stringify({
+      source,
+      inputMode,
+      ...(context?.sessionId && context?.roundId
+        ? {
+            sessionId: context.sessionId,
+            roundId: context.roundId
+          }
+        : {})
+    }),
     cache: "no-store",
     credentials: "include",
     signal

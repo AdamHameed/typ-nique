@@ -24,7 +24,20 @@ export const skipRoundSchema = z.object({
 
 export const previewRenderSchema = z.object({
   source: z.string().min(1).max(12000),
-  inputMode: z.enum(["math", "text"]).default("math")
+  inputMode: z.enum(["math", "text"]).default("math"),
+  sessionId: z.string().uuid().optional(),
+  roundId: z.string().uuid().optional()
+}).superRefine((value, ctx) => {
+  const hasSessionId = Boolean(value.sessionId);
+  const hasRoundId = Boolean(value.roundId);
+
+  if (hasSessionId !== hasRoundId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "sessionId and roundId must be provided together.",
+      path: hasSessionId ? ["roundId"] : ["sessionId"]
+    });
+  }
 });
 
 export const authRegisterSchema = z.object({

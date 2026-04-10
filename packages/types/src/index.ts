@@ -53,6 +53,8 @@ export interface ChallengeRoundPayload {
     category: ChallengeCategory;
     difficulty: ChallengeDifficulty;
     inputMode: ChallengeInputMode;
+    normalizedCanonicalSource: string;
+    acceptedAlternates: string[];
     renderedSvg: string;
     renderHash?: string;
   };
@@ -176,6 +178,8 @@ export interface PreviewRenderResponse {
   ok: boolean;
   svg?: string;
   renderHash?: string;
+  matchesTarget?: boolean;
+  matchTier?: MatchTier;
   effectiveSource?: string;
   autoWrappedMath?: boolean;
   inputMode?: ChallengeInputMode;

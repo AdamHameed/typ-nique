@@ -296,7 +296,8 @@ async function getGameSessionStateOrThrow(sessionId: string): Promise<GameSessio
           challenge: {
             include: {
               category: true,
-              canonicalArtifact: true
+              canonicalArtifact: true,
+              alternateSources: true
             }
           },
           bestSubmission: true,
@@ -386,6 +387,8 @@ function toRoundPayload(
       title: string;
       difficulty: number;
       category: { slug: string };
+      normalizedCanonicalSource: string;
+      alternateSources: { sourceText: string }[];
       canonicalArtifact: { svgInline: string | null; normalizedSvgHash: string } | null;
     };
   },
@@ -405,6 +408,8 @@ function toRoundPayload(
       category: round.challenge.category.slug as ChallengeRoundPayload["challenge"]["category"],
       difficulty: difficultyToLabel(round.challenge.difficulty),
       inputMode: round.challenge.category.slug === "text-formatting" ? "text" : "math",
+      normalizedCanonicalSource: round.challenge.normalizedCanonicalSource,
+      acceptedAlternates: round.challenge.alternateSources.map((alternate) => alternate.sourceText),
       renderedSvg: round.challenge.canonicalArtifact?.svgInline ?? "",
       renderHash: round.challenge.canonicalArtifact?.normalizedSvgHash
     }

@@ -57,6 +57,7 @@ pnpm dev
 
 ```bash
 pnpm dev           # start the full local stack
+pnpm dev:docker    # full clean Docker rebuild and restart
 pnpm dev:no-seed   # start without reseeding the database
 pnpm dev:reset     # wipe Docker volumes first, then start clean
 pnpm stop          # stop local apps and Docker services, keep volumes
@@ -101,10 +102,24 @@ docs/          Deployment and architecture notes
 If you want to run the whole stack in containers instead of using `pnpm dev`, use:
 
 ```bash
-docker compose -f infra/compose/docker-compose.yml up --build
+pnpm dev:docker
 ```
 
-That starts `web`, `api`, `worker`, `postgres`, and `redis` together in Docker.
+That command does a full clean Docker restart:
+
+- stops the current Docker stack
+- removes Docker volumes for this project
+- removes the app images
+- rebuilds everything from scratch with `--no-cache`
+- starts `web`, `api`, `worker`, `postgres`, and `redis`
+
+The compose stack also runs a one-shot `setup` container first to generate Prisma, apply migrations, and seed the database.
+
+If you need to rerun the container bootstrap manually:
+
+```bash
+docker compose -f infra/compose/docker-compose.yml run --rm setup
+```
 
 ## Troubleshooting
 
