@@ -26,7 +26,7 @@ Environment:
 Notes:
 
 - Browser requests should stay on the web origin.
-- The web app rewrites `/api/v1/*` to `API_INTERNAL_URL`, which keeps auth and guest cookies same-origin.
+- The web app proxies `/api/v1/*` at runtime to `API_INTERNAL_URL`, which keeps auth and guest cookies same-origin without requiring build-time API wiring.
 
 ### `api`
 
@@ -41,6 +41,7 @@ Environment:
 - `REDIS_URL=<Railway Redis connection string>`
 - `WORKER_RENDER_URL=http://<worker-private-domain>`
 - `WORKER_INTERNAL_TOKEN=<long-random-secret>`
+- `ALLOWED_BROWSER_ORIGINS=https://<your-web-domain>` only if browser traffic reaches the API or multiplayer gateway cross-origin
 - `AUTH_COOKIE_SECURE=true`
 - `AUTH_COOKIE_DOMAIN=<your-web-domain-without-protocol>` if you want explicit cookie scoping
 
@@ -55,6 +56,7 @@ Environment:
 - `REDIS_URL=<Railway Redis connection string>`
 - `WORKER_INTERNAL_TOKEN=<same-secret-as-api>`
 - `RENDER_ADMIN_TOKEN=<separate-admin-secret>`
+- `ENABLE_RENDER_ADMIN=true` only if you intentionally want the internal admin endpoint enabled
 - `TYPST_TIMEOUT_MS=4000`
 - `TYPST_MAX_MEMORY_KB=524288`
 - `TYPST_MAX_CONCURRENT_RENDERS=2`
@@ -108,3 +110,4 @@ Use:
 - Railway sets `PORT` automatically; the app now honors it for `api` and `worker`.
 - `web` already works with Railway's dynamic port through the Next standalone server.
 - Keep `worker` private. It should never be internet-exposed.
+- Multiplayer diagnostics are disabled by default in production. Only enable them deliberately if you need internal troubleshooting views.

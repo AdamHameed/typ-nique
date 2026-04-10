@@ -4,8 +4,34 @@ export const createGameSessionSchema = z.object({
   mode: z.enum(["practice", "daily"]).default("practice")
 });
 
+export const createMultiplayerRoomSchema = z.object({
+  durationMinutes: z.coerce.number().int().min(1).max(3).default(2)
+});
+
 export const sessionParamsSchema = z.object({
   sessionId: z.string().uuid()
+});
+
+export const multiplayerMatchParamsSchema = z.object({
+  matchId: z.string().uuid()
+});
+
+export const multiplayerRoomCodeParamsSchema = z.object({
+  roomCode: z.string().trim().min(4).max(32)
+});
+
+export const multiplayerReadySchema = z.object({
+  ready: z.boolean().default(true)
+});
+
+export const multiplayerVersionSchema = z.object({
+  roomVersion: z.number().int().nonnegative().optional()
+});
+
+export const multiplayerReadyMutationSchema = multiplayerReadySchema.merge(multiplayerVersionSchema);
+
+export const multiplayerResultsQuerySchema = z.object({
+  includeDiagnostics: z.coerce.boolean().default(false)
 });
 
 export const submitAttemptSchema = z.object({
@@ -42,7 +68,6 @@ export const previewRenderSchema = z.object({
 
 export const authRegisterSchema = z.object({
   username: z.string().min(3).max(40).regex(/^[a-zA-Z0-9_-]+$/),
-  email: z.string().email().max(255),
   password: z.string().min(8).max(128),
   displayName: z.string().min(2).max(80).optional()
 });
@@ -66,6 +91,7 @@ export const enqueueRenderCheckSchema = z.object({
 });
 
 export type CreateGameSessionInput = z.infer<typeof createGameSessionSchema>;
+export type CreateMultiplayerRoomInput = z.infer<typeof createMultiplayerRoomSchema>;
 export type SubmitAttemptInput = z.infer<typeof submitAttemptSchema>;
 export type EnqueueRenderCheckInput = z.infer<typeof enqueueRenderCheckSchema>;
 

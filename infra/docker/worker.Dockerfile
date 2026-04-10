@@ -32,10 +32,11 @@ RUN pnpm install --frozen-lockfile
 COPY . .
 
 RUN pnpm --filter @typ-nique/db generate
+RUN pnpm --filter @typ-nique/worker build
 
 ENV NODE_ENV=production
 ENV PORT=4100
 
 EXPOSE 4100
 
-CMD ["pnpm", "exec", "tsx", "apps/worker/src/index.ts"]
+CMD ["pnpm", "--filter", "@typ-nique/worker", "start"]

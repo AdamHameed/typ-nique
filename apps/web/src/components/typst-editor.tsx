@@ -55,7 +55,7 @@ export function TypstEditor({
         <label htmlFor={editorId}>
           Edit your code here
         </label>
-        <span>{inputMode === "math" ? "No delimiters needed" : "Text mode"}</span>
+        <span>No delimiters needed</span>
       </div>
       <textarea
         id={editorId}

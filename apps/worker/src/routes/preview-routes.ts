@@ -3,6 +3,7 @@ import type { PreviewRenderResponse } from "@typ-nique/types";
 import { toRenderableTypstSourceForMode } from "@typ-nique/checker";
 import { previewRenderSchema } from "@typ-nique/validation";
 import { env } from "../lib/env.js";
+import { matchesSecret } from "../lib/secrets.js";
 import { renderSubmission } from "../renderer/service.js";
 
 export async function previewRoutes(app: FastifyInstance) {
@@ -61,15 +62,21 @@ export async function previewRoutes(app: FastifyInstance) {
 }
 
 function isAuthorizedInternalRequest(token: string | string[] | undefined) {
-  if (!env.WORKER_INTERNAL_TOKEN) {
-    return true;
+  const secret = env.WORKER_INTERNAL_TOKEN;
+
+  if (!secret) {
+    return env.NODE_ENV !== "production";
   }
 
   if (Array.isArray(token)) {
-    return token.includes(env.WORKER_INTERNAL_TOKEN);
+    return token.some((value) => matchesSecret(value, secret));
   }
 
-  return token === env.WORKER_INTERNAL_TOKEN;
+  if (typeof token !== "string") {
+    return false;
+  }
+
+  return matchesSecret(token, secret);
 }
 
 function buildMathPreviewFallback(source: string) {

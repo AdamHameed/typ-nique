@@ -4,24 +4,21 @@ import { hashPassword, verifyPassword } from "../lib/auth.js";
 
 export async function registerUser(input: {
   username: string;
-  email: string;
   password: string;
   displayName?: string;
 }) {
-  const existing = await prisma.user.findFirst({
-    where: {
-      OR: [{ username: input.username }, { email: input.email.toLowerCase() }]
-    }
+  const existing = await prisma.user.findUnique({
+    where: { username: input.username }
   });
 
   if (existing) {
-    throw new Error(existing.username === input.username ? "Username is already taken." : "Email is already in use.");
+    throw new Error("Username is already taken.");
   }
 
   return prisma.user.create({
     data: {
       username: input.username,
-      email: input.email.toLowerCase(),
+      email: null,
       displayName: input.displayName?.trim() || input.username,
       passwordHash: hashPassword(input.password)
     }

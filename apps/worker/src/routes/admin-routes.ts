@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { env } from "../lib/env.js";
+import { matchesSecret } from "../lib/secrets.js";
 import { getRenderCacheState } from "../renderer/cache.js";
 import { getRenderConcurrencyState } from "../renderer/concurrency.js";
 import { getRendererAdminState } from "../renderer/service.js";
@@ -23,13 +24,19 @@ export async function adminRoutes(app: FastifyInstance) {
 }
 
 function isAuthorized(token: string | string[] | undefined) {
-  if (!env.RENDER_ADMIN_TOKEN) {
+  const secret = env.RENDER_ADMIN_TOKEN;
+
+  if (!secret) {
     return false;
   }
 
   if (Array.isArray(token)) {
-    return token.includes(env.RENDER_ADMIN_TOKEN);
+    return token.some((value) => matchesSecret(value, secret));
   }
 
-  return token === env.RENDER_ADMIN_TOKEN;
+  if (typeof token !== "string") {
+    return false;
+  }
+
+  return matchesSecret(token, secret);
 }

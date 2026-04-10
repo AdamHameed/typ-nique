@@ -1,4 +1,3 @@
-import "dotenv/config";
 import { z } from "zod";
 
 const optionalNumber = z.preprocess((value) => {
@@ -9,6 +8,20 @@ const optionalNumber = z.preprocess((value) => {
   return value;
 }, z.coerce.number().optional());
 
+const optionalBoolean = z.preprocess((value) => {
+  if (value === "" || value === undefined || value === null) {
+    return undefined;
+  }
+
+  return value;
+}, z.union([z.literal("true"), z.literal("false")]).optional().transform((value) => {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  return value === "true";
+}));
+
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: optionalNumber,
@@ -17,6 +30,7 @@ const envSchema = z.object({
   QUEUE_NAME: z.string().default("render-jobs"),
   WORKER_INTERNAL_TOKEN: z.string().min(1).optional(),
   RENDER_ADMIN_TOKEN: z.string().min(1).optional(),
+  ENABLE_RENDER_ADMIN: optionalBoolean,
   TYPST_BIN: z.string().default("typst"),
   TYPST_TIMEOUT_MS: z.coerce.number().default(4000),
   TYPST_MAX_MEMORY_KB: z.coerce.number().default(524288),
@@ -33,7 +47,12 @@ const envSchema = z.object({
 
 const parsedEnv = envSchema.parse(process.env);
 
+if (parsedEnv.NODE_ENV === "production" && !parsedEnv.WORKER_INTERNAL_TOKEN) {
+  throw new Error("WORKER_INTERNAL_TOKEN must be set in production.");
+}
+
 export const env = {
   ...parsedEnv,
-  WORKER_PORT: parsedEnv.PORT ?? parsedEnv.WORKER_PORT
+  WORKER_PORT: parsedEnv.PORT ?? parsedEnv.WORKER_PORT,
+  ENABLE_RENDER_ADMIN: parsedEnv.ENABLE_RENDER_ADMIN ?? false
 };

@@ -1,16 +1,24 @@
-import type {
-  ChallengeDifficulty,
-  ChallengeRoundPayload,
-  GameSessionResult,
-  GameSessionState,
-  MatchTier,
-  RoundBreakdown,
-  SubmissionVerdict
+import {
+  calculateRoundPointValue,
+  calculateStreakMultiplier,
+  type ChallengeDifficulty,
+  type ChallengeRoundPayload,
+  type GameSessionResult,
+  type GameSessionState,
+  type MatchTier,
+  type RoundBreakdown,
+  type SubmissionVerdict
 } from "@typ-nique/types";
 import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { ensureDailyChallengeForDate, getChallengeRotation } from "./challenge-service.js";
+import { extendMultiplayerChallengeIds, syncMultiplayerSessionState } from "./multiplayer-service.js";
+import {
+  activateSession,
+  expireSessionIfNeeded,
+  ensureSessionProgression as ensureSharedSessionProgression
+} from "./session-progression-service.js";
 
 const PRACTICE_DURATION_MS = 3 * 60 * 1000;
 
@@ -48,7 +56,7 @@ export async function createGameSession(mode: "practice" | "daily", actor: Sessi
   const session = await prisma.gameSession.create({
     data: {
       mode: mode.toUpperCase() as "PRACTICE" | "DAILY",
-      status: "ACTIVE",
+      status: "PENDING",
       startedAt,
       timeLimitMs: PRACTICE_DURATION_MS,
       seed: randomUUID(),
@@ -58,14 +66,14 @@ export async function createGameSession(mode: "practice" | "daily", actor: Sessi
       metadata: {
         challengeIds,
         dailyChallengeDate: dailyChallenge?.challengeDate.toISOString() ?? null
-      },
-      rounds: {
-        create: {
-          position: 1,
-          challengeId: challengeIds[0]!
-        }
       }
     }
+  });
+
+  await activateSession(session.id, {
+    startedAt,
+    seed: session.seed,
+    challengeIds
   });
 
   return getGameSessionStateOrThrow(session.id);
@@ -138,7 +146,8 @@ export async function finishGameSession(sessionId: string, actor: SessionActor):
     select: {
       id: true,
       userId: true,
-      playerSessionId: true
+      playerSessionId: true,
+      matchId: true
     }
   });
 
@@ -151,6 +160,10 @@ export async function finishGameSession(sessionId: string, actor: SessionActor):
       endedAt: new Date()
     }
   });
+
+  if (session.matchId) {
+    await syncMultiplayerSessionState(sessionId);
+  }
 
   return getGameSessionResults(sessionId, actor);
 }
@@ -220,68 +233,35 @@ export async function getGameSessionResults(sessionId: string, actor: SessionAct
 }
 
 export async function ensureSessionProgression(sessionId: string) {
-  await expireSessionIfNeeded(sessionId);
-
-  const session = await prisma.gameSession.findUnique({
-    where: { id: sessionId },
-    include: {
-      rounds: {
-        orderBy: { position: "desc" },
-        take: 1
-      }
-    }
-  });
-
-  if (!session || session.status !== "ACTIVE") {
-    return;
-  }
-
-  const latestRound = session.rounds[0];
-
-  if (!latestRound) {
-    return;
-  }
-
-  if (!latestRound.resolvedAt) {
-    return;
-  }
-
-  let challengeIds = getChallengeIds(session.metadata);
-  const nextIndex = latestRound.position;
-
-  if (nextIndex >= challengeIds.length) {
-    if (session.mode === "PRACTICE") {
-      challengeIds = await extendPracticeChallengeIds(session.id, session.metadata, challengeIds);
-    }
-
-    if (nextIndex >= challengeIds.length) {
-      await prisma.gameSession.update({
-        where: { id: sessionId },
-        data: {
-          status: "COMPLETED",
-          endedAt: new Date()
+  await ensureSharedSessionProgression(sessionId, {
+    extendChallengeIds: async ({ sessionId: activeSessionId, metadata, challengeIds }) => {
+      const session = await prisma.gameSession.findUnique({
+        where: { id: activeSessionId },
+        select: {
+          mode: true,
+          matchId: true
         }
       });
-      return;
-    }
-  }
 
-  const nextRoundExists = await prisma.gameRound.findFirst({
-    where: {
-      gameSessionId: sessionId,
-      position: latestRound.position + 1
-    }
-  });
+      if (session?.mode === "MULTIPLAYER" && session.matchId) {
+        return extendMultiplayerChallengeIds(session.matchId, activeSessionId, metadata, challengeIds);
+      }
 
-  if (nextRoundExists) {
-    return;
-  }
+      if (session?.mode !== "PRACTICE") {
+        return challengeIds;
+      }
 
-  await prisma.gameRound.create({
-    data: {
-      gameSessionId: sessionId,
-      challengeId: challengeIds[nextIndex]!,
-      position: latestRound.position + 1
+      return extendPracticeChallengeIds(activeSessionId, metadata, challengeIds);
+    },
+    onSessionCompleted: async (completedSessionId) => {
+      const session = await prisma.gameSession.findUnique({
+        where: { id: completedSessionId },
+        select: { matchId: true }
+      });
+
+      if (session?.matchId) {
+        await syncMultiplayerSessionState(completedSessionId);
+      }
     }
   });
 }
@@ -328,7 +308,16 @@ async function getGameSessionStateOrThrow(sessionId: string): Promise<GameSessio
     attemptedCount: session.promptsAttempted,
     accuracy: calculateAccuracy(session.promptsCorrect, session.promptsAttempted),
     streak: calculateCurrentStreak(session.rounds),
-    currentRound: currentRound ? toRoundPayload(session.id, session.totalScore, calculateCurrentStreak(session.rounds), currentRound, timeRemainingMs) : null,
+    currentRound: currentRound
+      ? toRoundPayload(
+          session.id,
+          session.mode === "MULTIPLAYER",
+          session.totalScore,
+          calculateCurrentStreak(session.rounds),
+          currentRound,
+          timeRemainingMs
+        )
+      : null,
     lastResult: latestResolved
       ? {
           verdict:
@@ -350,32 +339,9 @@ async function getGameSessionStateOrThrow(sessionId: string): Promise<GameSessio
   };
 }
 
-async function expireSessionIfNeeded(sessionId: string) {
-  const session = await prisma.gameSession.findUnique({
-    where: { id: sessionId }
-  });
-
-  if (!session || session.status !== "ACTIVE") {
-    return;
-  }
-
-  const endsAt = session.startedAt.getTime() + (session.timeLimitMs ?? PRACTICE_DURATION_MS);
-
-  if (Date.now() < endsAt) {
-    return;
-  }
-
-  await prisma.gameSession.update({
-    where: { id: sessionId },
-    data: {
-      status: "COMPLETED",
-      endedAt: new Date(endsAt)
-    }
-  });
-}
-
 function toRoundPayload(
   sessionId: string,
+  hideCanonicalRenderHash: boolean,
   score: number,
   streak: number,
   round: {
@@ -387,6 +353,7 @@ function toRoundPayload(
       title: string;
       difficulty: number;
       category: { slug: string };
+      canonicalSource: string;
       normalizedCanonicalSource: string;
       alternateSources: { sourceText: string }[];
       canonicalArtifact: { svgInline: string | null; normalizedSvgHash: string } | null;
@@ -399,6 +366,8 @@ function toRoundPayload(
     roundId: round.id,
     score,
     streak,
+    pointsAvailable: calculateRoundPointValue(round.challenge.canonicalSource, streak),
+    streakMultiplier: calculateStreakMultiplier(streak),
     roundNumber: round.position,
     timeRemainingMs,
     challenge: {
@@ -407,11 +376,11 @@ function toRoundPayload(
       title: round.challenge.title,
       category: round.challenge.category.slug as ChallengeRoundPayload["challenge"]["category"],
       difficulty: difficultyToLabel(round.challenge.difficulty),
-      inputMode: round.challenge.category.slug === "text-formatting" ? "text" : "math",
+      inputMode: "math",
       normalizedCanonicalSource: round.challenge.normalizedCanonicalSource,
       acceptedAlternates: round.challenge.alternateSources.map((alternate) => alternate.sourceText),
       renderedSvg: round.challenge.canonicalArtifact?.svgInline ?? "",
-      renderHash: round.challenge.canonicalArtifact?.normalizedSvgHash
+      ...(hideCanonicalRenderHash ? {} : { renderHash: round.challenge.canonicalArtifact?.normalizedSvgHash })
     }
   };
 }
@@ -480,15 +449,6 @@ function mapVerdict(verdict: "CORRECT" | "INCORRECT" | "COMPILE_ERROR" | "TIMEOU
 function mapMatchTier(tier: "EXACT" | "NORMALIZED" | "RENDERED" | "ALTERNATE" | "NONE" | null): MatchTier {
   if (!tier) return "none";
   return tier.toLowerCase() as MatchTier;
-}
-
-function getChallengeIds(metadata: Prisma.JsonValue): string[] {
-  if (!metadata || typeof metadata !== "object" || !("challengeIds" in metadata)) {
-    return [];
-  }
-
-  const challengeIds = (metadata as { challengeIds?: unknown }).challengeIds;
-  return Array.isArray(challengeIds) ? challengeIds.filter((value): value is string => typeof value === "string") : [];
 }
 
 async function extendPracticeChallengeIds(sessionId: string, existingMetadata: Prisma.JsonValue, existingChallengeIds: string[]) {

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata } from "next/dist/lib/metadata/types/metadata-interface";
 import { IBM_Plex_Mono, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 

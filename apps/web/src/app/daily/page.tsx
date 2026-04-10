@@ -5,6 +5,8 @@ import { SiteShell } from "../../components/site-shell";
 import { getDailyChallenge, getDailyLeaderboard } from "../../lib/api";
 import { featureFlags } from "../../lib/features";
 
+export const dynamic = "force-dynamic";
+
 export default async function DailyPage() {
   if (!featureFlags.dailyMode) {
     notFound();

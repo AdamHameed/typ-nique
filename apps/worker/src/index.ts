@@ -1,5 +1,5 @@
 import Fastify from "fastify";
-import cors from "@fastify/cors";
+import helmet from "@fastify/helmet";
 import { adminRoutes } from "./routes/admin-routes.js";
 import { previewRoutes } from "./routes/preview-routes.js";
 import { env } from "./lib/env.js";
@@ -32,12 +32,16 @@ worker.on("failed", (job, error) => {
 });
 
 const app = Fastify({
+  bodyLimit: 16 * 1024,
   logger: false
 });
 
-await app.register(cors, { origin: true });
+await app.register(helmet);
 await app.register(previewRoutes);
-await app.register(adminRoutes);
+
+if (env.ENABLE_RENDER_ADMIN && env.RENDER_ADMIN_TOKEN) {
+  await app.register(adminRoutes);
+}
 
 app.get("/health", async () => ({ ok: true }));
 

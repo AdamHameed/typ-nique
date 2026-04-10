@@ -1,7 +1,9 @@
 import { buildApp } from "./app.js";
+import { registerMultiplayerGateway } from "./gateways/multiplayer-gateway.js";
 import { env } from "./lib/env.js";
 
 const app = buildApp();
+registerMultiplayerGateway(app);
 
 app
   .listen({

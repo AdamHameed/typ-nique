@@ -24,10 +24,11 @@ RUN pnpm install --frozen-lockfile
 COPY . .
 
 RUN pnpm --filter @typ-nique/db generate
+RUN pnpm --filter @typ-nique/api build
 
 ENV NODE_ENV=production
 ENV PORT=4000
 
 EXPOSE 4000
 
-CMD ["pnpm", "exec", "tsx", "apps/api/src/server.ts"]
+CMD ["pnpm", "--filter", "@typ-nique/api", "start"]

@@ -139,7 +139,7 @@ async function getPreviewComparisonPrompt(input: {
         : round.challenge.difficulty === 2
           ? "medium"
           : "hard",
-    inputMode: round.challenge.category.slug === "text-formatting" ? "text" : "math",
+    inputMode: "math",
     canonicalSource: round.challenge.canonicalSource,
     normalizedCanonicalSource: round.challenge.normalizedCanonicalSource,
     renderedSvg: round.challenge.canonicalArtifact.svgInline ?? "",

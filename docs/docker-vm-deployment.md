@@ -10,10 +10,10 @@
 
 ## Local development
 
-Use [infra/compose/docker-compose.yml](/Users/adam/Downloads/Projects/typ-nique/infra/compose/docker-compose.yml) for local development. It is optimized for bind mounts, live reload, and container health checks.
+Use [docker-compose.dev.yml](/Users/adam/Downloads/Projects/typ-nique/infra/compose/docker-compose.dev.yml) for local development. It is optimized for bind mounts, live reload, and container health checks, and should not be used as a production deployment template.
 
 ```bash
-docker compose -f infra/compose/docker-compose.yml up --build
+docker compose -f infra/compose/docker-compose.dev.yml up --build
 ```
 
 ## Production image strategy
@@ -27,7 +27,7 @@ Use the production Dockerfiles:
 Notes:
 
 - `web` builds with Next.js standalone output and runs with `next start` style output.
-- `api` runs the Fastify server from source through `tsx`, which is a reasonable solo-developer tradeoff for a VM deployment.
+- `api` builds first and starts from the compiled entrypoint through `tsx`, which keeps runtime aligned with the workspace package layout without booting directly from source.
 - `worker` includes a Typst CLI binary built in a dedicated stage and copies it into the final runtime image.
 
 ## Environment variables
@@ -43,6 +43,7 @@ Production-specific values to change:
 - `WORKER_RENDER_URL`
 - `WORKER_INTERNAL_TOKEN`
 - `RENDER_ADMIN_TOKEN`
+- `ALLOWED_BROWSER_ORIGINS` if browser traffic reaches `api` or the multiplayer gateway cross-origin
 - `AUTH_COOKIE_NAME`
 - `GUEST_COOKIE_NAME`
 - `NEXT_PUBLIC_API_URL`
@@ -52,6 +53,7 @@ Recommended production values:
 - `NEXT_PUBLIC_API_URL=https://typnique.example.com`
 - `WORKER_RENDER_URL=http://worker:4100`
 - keep `WORKER_INTERNAL_TOKEN` and `RENDER_ADMIN_TOKEN` long and random
+- leave multiplayer diagnostics disabled unless you intentionally need them in production
 
 ## Volume strategy
 
@@ -92,7 +94,7 @@ Practical setup on a VM:
 - keep `api`, `worker`, `postgres`, and `redis` on an internal Docker network
 - terminate TLS at the reverse proxy
 - route browser traffic to `web`
-- route `/api/*` to `api`
+- let `web` proxy `/api/v1/*` to `api` internally
 
 Example:
 

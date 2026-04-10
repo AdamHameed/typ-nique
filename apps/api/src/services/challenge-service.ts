@@ -8,8 +8,8 @@ function mapDifficulty(value: number): ChallengePrompt["difficulty"] {
   return "hard";
 }
 
-function resolveInputMode(categorySlug: string): ChallengePrompt["inputMode"] {
-  return categorySlug === "text-formatting" ? "text" : "math";
+function resolveInputMode(_categorySlug: string): ChallengePrompt["inputMode"] {
+  return "math";
 }
 
 export async function getDailyChallenge(): Promise<ChallengePrompt | null> {

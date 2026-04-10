@@ -57,14 +57,28 @@ export function LeaderboardTable({
         <Card>
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <h2 className="text-4xl font-semibold text-[var(--text)]">Highest Weekly Scores</h2>
+              <h2 className="text-4xl font-semibold text-[var(--text)]">{getLeaderboardHeading(board.scope)}</h2>
               <p className="mt-2 texnique-note">
                 Ranked by score, then earlier finish time. Guests are shown with anonymized labels.
               </p>
+              <div className="mt-4 flex flex-wrap gap-2 text-sm">
+                <Link
+                  href="/leaderboard?scope=weekly"
+                  className={getScopeLinkClass(board.scope === "weekly")}
+                >
+                  Weekly
+                </Link>
+                <Link
+                  href="/leaderboard?scope=global"
+                  className={getScopeLinkClass(board.scope === "global")}
+                >
+                  All Time
+                </Link>
+              </div>
             </div>
-            <div className="border-2 border-[color:var(--text)] px-3 py-1 text-sm text-[var(--muted)]">
-              {board.scope}
-            </div>
+            {/* <div className="border-2 border-[color:var(--text)] px-3 py-1 text-sm text-[var(--muted)]">
+              {getScopeLabel(board.scope)}
+            </div> */}
           </div>
 
           <div className="texnique-table-wrap mt-6">
@@ -72,7 +86,7 @@ export function LeaderboardTable({
               <thead>
                 <tr>
                   <th>Rank</th>
-                  <th>Player</th>
+                  <th>Player</th> 
                   <th>Score</th>
                   <th>Accuracy</th>
                   <th>Solved</th>
@@ -130,6 +144,32 @@ export function LeaderboardTable({
       </div>
     </div>
   );
+}
+
+function getLeaderboardHeading(scope: LeaderboardResponse["scope"]) {
+  if (scope === "global") {
+    return "Highest All-Time Scores";
+  }
+
+  if (scope === "daily") {
+    return "Highest Daily Scores";
+  }
+
+  return "Highest Weekly Scores";
+}
+
+function getScopeLabel(scope: LeaderboardResponse["scope"]) {
+  if (scope === "global") {
+    return "All time";
+  }
+
+  return scope;
+}
+
+function getScopeLinkClass(active: boolean) {
+  return active
+    ? "border-2 border-[color:var(--text)] px-3 py-1 text-[var(--text)]"
+    : "border-2 border-transparent px-3 py-1 text-[var(--muted)] transition hover:border-[color:var(--line)] hover:text-[var(--text)]";
 }
 
 function LeaderboardRunsCard({

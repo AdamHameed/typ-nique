@@ -14,6 +14,9 @@ export function Hero() {
         <Link href="/play">
           <Button className="px-6 py-3 text-base">Play</Button>
         </Link>
+        <Link href="/multiplayer">
+          <Button className="px-6 py-3 text-base">Multiplayer</Button>
+        </Link>
         {featureFlags.dailyMode ? (
           <Link href="/daily">
             <Button className="px-6 py-3 text-base">Daily</Button>

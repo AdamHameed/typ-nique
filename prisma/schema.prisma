@@ -82,9 +82,17 @@ enum MultiplayerMode {
 
 enum MultiplayerMatchStatus {
   PENDING
+  COUNTDOWN
   ACTIVE
   COMPLETED
   CANCELLED
+}
+
+enum MultiplayerPlayerConnectionStatus {
+  CONNECTED
+  IDLE
+  DISCONNECTED
+  LEFT
 }
 
 model User {
@@ -278,15 +286,29 @@ model DailyChallengeItem {
 model MultiplayerMatch {
   id                  String                 @id @default(uuid()) @db.Uuid
   mode                MultiplayerMode
+  roomCode            String                 @unique @db.VarChar(12)
+  hostPlayerId        String?                @db.Uuid
   status              MultiplayerMatchStatus @default(PENDING)
+  maxPlayers          Int                    @default(4)
+  rulesVersion        Int                    @default(1)
+  countdownDurationMs Int                    @default(5000)
+  countdownEndsAt     DateTime?              @db.Timestamptz(6)
   seed                String                 @db.VarChar(120)
+  challengeIds        String[]               @db.Uuid
+  startedRoundIndex   Int                    @default(0)
+  roomVersion         Int                    @default(1)
   startedAt           DateTime?              @db.Timestamptz(6)
-  endedAt             DateTime?              @db.Timestamptz(6)
+  finishedAt          DateTime?              @db.Timestamptz(6)
   createdAt           DateTime               @default(now()) @db.Timestamptz(6)
+  updatedAt           DateTime               @updatedAt @db.Timestamptz(6)
+  hostPlayer          MultiplayerMatchPlayer? @relation("MultiplayerMatchHost", fields: [hostPlayerId], references: [id], onDelete: SetNull)
   gameSessions        GameSession[]
-  players             MultiplayerMatchPlayer[]
+  players             MultiplayerMatchPlayer[] @relation("MultiplayerMatchMembership")
 
   @@index([status, createdAt])
+  @@index([status, countdownEndsAt])
+  @@index([finishedAt])
+  @@index([updatedAt])
 }
 
 model GameSession {
@@ -444,18 +466,32 @@ model LeaderboardEntry {
 }
 
 model MultiplayerMatchPlayer {
-  id                  String                 @id @default(uuid()) @db.Uuid
-  multiplayerMatchId  String                 @db.Uuid
-  userId              String?                @db.Uuid
-  playerSessionId     String?                @db.Uuid
-  gameSessionId       String?                @db.Uuid
-  joinedAt            DateTime               @default(now()) @db.Timestamptz(6)
+  id                  String                            @id @default(uuid()) @db.Uuid
+  matchId             String                            @db.Uuid @map("multiplayerMatchId")
+  userId              String?                           @db.Uuid
+  playerSessionId     String?                           @db.Uuid
+  gameSessionId       String?                           @db.Uuid
+  displayName         String                            @db.VarChar(80)
+  joinedAt            DateTime                          @default(now()) @db.Timestamptz(6)
+  readyAt             DateTime?                         @db.Timestamptz(6)
+  leftAt              DateTime?                         @db.Timestamptz(6)
+  finishedAt          DateTime?                         @db.Timestamptz(6)
   finalPlace          Int?
-  multiplayerMatch    MultiplayerMatch       @relation(fields: [multiplayerMatchId], references: [id], onDelete: Cascade)
-  user                User?                  @relation(fields: [userId], references: [id], onDelete: SetNull)
-  playerSession       PlayerSession?         @relation(fields: [playerSessionId], references: [id], onDelete: SetNull)
-  gameSession         GameSession?           @relation(fields: [gameSessionId], references: [id], onDelete: SetNull)
+  connectionStatus    MultiplayerPlayerConnectionStatus @default(CONNECTED)
+  lastHeartbeatAt     DateTime?                         @db.Timestamptz(6)
+  match               MultiplayerMatch                  @relation("MultiplayerMatchMembership", fields: [matchId], references: [id], onDelete: Cascade)
+  hostForMatches      MultiplayerMatch[]                @relation("MultiplayerMatchHost")
+  user                User?                             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  playerSession       PlayerSession?                    @relation(fields: [playerSessionId], references: [id], onDelete: SetNull)
+  gameSession         GameSession?                      @relation(fields: [gameSessionId], references: [id], onDelete: SetNull)
 
-  @@index([multiplayerMatchId])
+  @@unique([matchId, userId])
+  @@unique([matchId, playerSessionId])
+  @@unique([matchId, gameSessionId])
+  @@unique([matchId, finalPlace])
+  @@index([matchId, joinedAt])
+  @@index([matchId, finalPlace])
+  @@index([matchId, connectionStatus, lastHeartbeatAt])
   @@index([userId])
+  @@index([playerSessionId])
 }

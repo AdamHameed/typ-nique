@@ -6,10 +6,10 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
-    "generate": "dotenv -e ../.env -- prisma generate",
-    "migrate": "dotenv -e ../.env -- prisma migrate dev --name init",
-    "deploy": "dotenv -e ../.env -- prisma migrate deploy",
-    "seed": "dotenv -e ../.env -- tsx prisma/seed.ts",
+    "generate": "prisma generate",
+    "migrate": "prisma migrate dev --name init",
+    "deploy": "prisma migrate deploy",
+    "seed": "tsx prisma/seed.ts",
     "lint": "tsc -p tsconfig.json --noEmit",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

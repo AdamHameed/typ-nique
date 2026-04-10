@@ -1,3 +1,7 @@
+# Development-only compose stack.
+# This file intentionally keeps bind mounts, env_file usage, and local bootstrap helpers
+# for day-to-day development. Do not use it as a production deployment template.
+
 name: ${COMPOSE_PROJECT_NAME:-typnique}
 
 services:

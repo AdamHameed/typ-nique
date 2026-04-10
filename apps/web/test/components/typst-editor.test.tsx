@@ -19,7 +19,7 @@ describe("TypstEditor", () => {
 
   it("shows text-mode guidance", () => {
     render(<TypstEditor value="#strong[Hello]" onChange={() => {}} inputMode="text" />);
-    expect(screen.getByText(/^Text mode$/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/No delimiters needed/i)).not.toHaveLength(0);
     expect(screen.getByText(/14 characters/i)).toBeInTheDocument();
   });
 });

@@ -19,6 +19,8 @@ const sessionState = {
     roundId: "round-1",
     score: 0,
     streak: 0,
+    pointsAvailable: 75,
+    streakMultiplier: 1,
     roundNumber: 1,
     timeRemainingMs: 170000,
     challenge: {

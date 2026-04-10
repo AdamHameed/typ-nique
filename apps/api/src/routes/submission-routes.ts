@@ -29,6 +29,12 @@ export async function submissionRoutes(app: FastifyInstance) {
 
       return reply.code(200).send({ data: result });
     } catch (error) {
+      if (error instanceof Error && error.message === "Multiplayer submission rate limit reached.") {
+        return reply.code(429).send({
+          error: "Race submission rate limit reached. Please slow down and try again."
+        });
+      }
+
       if (error instanceof Error && error.message === "Round not accessible.") {
         return reply.code(403).send({ error: error.message });
       }
