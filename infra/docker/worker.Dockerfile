@@ -40,8 +40,15 @@ FROM deps AS build
 COPY . .
 
 RUN pnpm --filter @typ-nique/db generate
-RUN pnpm --filter @typ-nique/worker build
+RUN pnpm exec turbo run build --filter=@typ-nique/worker
 RUN pnpm --filter @typ-nique/worker deploy --prod /prod/worker
+RUN generated_prisma_client="$(find /app/node_modules -path '*/node_modules/.prisma/client' -type d | head -n 1)" \
+  && deployed_prisma_client="$(find /prod/worker/node_modules -path '*/node_modules/.prisma/client' -type d | head -n 1)" \
+  && test -n "$generated_prisma_client" \
+  && test -n "$deployed_prisma_client" \
+  && rm -rf "$deployed_prisma_client" \
+  && mkdir -p "$(dirname "$deployed_prisma_client")" \
+  && cp -R "$generated_prisma_client" "$deployed_prisma_client"
 
 FROM node:22-bookworm-slim AS runtime
 

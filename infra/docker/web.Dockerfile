@@ -34,7 +34,7 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN pnpm --filter @typ-nique/db generate
-RUN pnpm --filter @typ-nique/web build
+RUN pnpm exec turbo run build --filter=@typ-nique/web
 
 FROM node:22-bookworm-slim AS runner
 
