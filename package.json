@@ -23,6 +23,7 @@
     "db:generate": "bash -lc 'if [ -f .env ]; then dotenv -e .env -- pnpm --filter @typ-nique/db generate; else pnpm --filter @typ-nique/db generate; fi'",
     "db:migrate": "bash -lc 'if [ -f .env ]; then dotenv -e .env -- pnpm --filter @typ-nique/db migrate; else pnpm --filter @typ-nique/db migrate; fi'",
     "db:deploy": "bash -lc 'if [ -f .env ]; then dotenv -e .env -- pnpm --filter @typ-nique/db deploy; else pnpm --filter @typ-nique/db deploy; fi'",
+    "db:seed:content": "bash -lc 'if [ -f .env ]; then dotenv -e .env -- pnpm --filter @typ-nique/db seed:content; else pnpm --filter @typ-nique/db seed:content; fi'",
     "db:seed": "bash -lc 'if [ -f .env ]; then dotenv -e .env -- pnpm --filter @typ-nique/db seed; else pnpm --filter @typ-nique/db seed; fi'",
     "content:validate": "tsx scripts/challenges/validate.ts",
     "content:render": "tsx scripts/challenges/render.ts",
