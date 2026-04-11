@@ -1,28 +1,10 @@
 import type { NextRequest } from "next/server";
-import { getServerEnv, isProduction, publicEnv } from "../../../../lib/env";
+import { resolveServerApiOrigin } from "../../../../lib/env";
 
 export const dynamic = "force-dynamic";
 
-function resolveApiOrigin() {
-  const serverEnv = getServerEnv();
-
-  if (serverEnv.API_INTERNAL_URL) {
-    return serverEnv.API_INTERNAL_URL;
-  }
-
-  if (publicEnv.NEXT_PUBLIC_API_URL) {
-    return publicEnv.NEXT_PUBLIC_API_URL;
-  }
-
-  if (!isProduction) {
-    return "http://127.0.0.1:4000";
-  }
-
-  throw new Error("API_INTERNAL_URL or NEXT_PUBLIC_API_URL must be set for the web API proxy in production.");
-}
-
 async function proxyRequest(request: NextRequest, path: string[]) {
-  const targetUrl = new URL(`/api/v1/${path.join("/")}${request.nextUrl.search}`, resolveApiOrigin());
+  const targetUrl = new URL(`/api/v1/${path.join("/")}${request.nextUrl.search}`, resolveServerApiOrigin());
   const headers = new Headers(request.headers);
 
   headers.delete("host");

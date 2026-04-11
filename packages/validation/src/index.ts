@@ -11,8 +11,8 @@ export function parseServiceEnv<TSchema extends z.ZodTypeAny>(
     return parsed.data;
   }
 
-  console.error(
-    JSON.stringify({
+  process.stderr.write(
+    `${JSON.stringify({
       category: "startup",
       event: "invalid-env",
       service,
@@ -20,7 +20,7 @@ export function parseServiceEnv<TSchema extends z.ZodTypeAny>(
         path: issue.path.join(".") || "<root>",
         message: issue.message
       }))
-    })
+    })}\n`
   );
 
   throw new Error(`Invalid ${service} environment configuration.`);

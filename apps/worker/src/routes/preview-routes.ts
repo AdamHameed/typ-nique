@@ -12,7 +12,9 @@ export async function previewRoutes(app: FastifyInstance) {
     if (!isAuthorizedInternalRequest(request.headers["x-worker-internal-token"])) {
       logSecurityEvent("worker-preview-auth-rejected", {
         requestId: request.id,
-        ip: request.ip
+        ip: request.ip,
+        method: request.method,
+        path: request.url
       });
 
       return reply.code(401).send({

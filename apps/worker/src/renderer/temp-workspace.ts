@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -10,6 +10,7 @@ export interface RenderWorkspace {
 
 export async function createRenderWorkspace(tempRootDir?: string): Promise<RenderWorkspace> {
   const baseDir = tempRootDir ?? os.tmpdir();
+  await mkdir(baseDir, { recursive: true });
   const rootDir = await mkdtemp(path.join(baseDir, "typ-nique-render-"));
 
   return {

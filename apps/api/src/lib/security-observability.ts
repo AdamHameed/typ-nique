@@ -1,3 +1,5 @@
+import { apiLogger, sanitizeLogMetadata } from "./logger.js";
+
 type SecurityLogLevel = "info" | "warn" | "error";
 
 export function logSecurityEvent(
@@ -5,24 +7,15 @@ export function logSecurityEvent(
   payload: Record<string, unknown>,
   level: SecurityLogLevel = "warn"
 ) {
-  const record = JSON.stringify({
-    category: "security",
-    event,
-    occurredAt: new Date().toISOString(),
-    ...payload
-  });
-
-  if (level === "error") {
-    console.error(record);
-    return;
-  }
-
-  if (level === "info") {
-    console.info(record);
-    return;
-  }
-
-  console.warn(record);
+  apiLogger[level](
+    sanitizeLogMetadata({
+      category: "security",
+      event,
+      occurredAt: new Date().toISOString(),
+      ...payload
+    }),
+    event
+  );
 }
 
 export function sanitizeMultiplayerClientError(message: string) {

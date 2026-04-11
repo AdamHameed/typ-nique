@@ -41,6 +41,11 @@ export async function authRoutes(app: FastifyInstance) {
       user = await registerUser(body);
     } catch (error) {
       if (error instanceof Error && error.message === "Username is already taken.") {
+        logSecurityEvent("auth-register-conflict", {
+          requestId: request.id,
+          ip: request.ip,
+          principalHash: hashPrincipal(body.username)
+        });
         return reply.code(409).send({ error: error.message });
       }
 

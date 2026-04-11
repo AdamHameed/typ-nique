@@ -14,24 +14,16 @@ import type {
   PreviewRenderResponse,
   SubmissionOutcome
 } from "@typ-nique/types";
-import { isProduction, publicEnv } from "./public-env";
+import { resolveServerApiOrigin, publicEnv } from "./env";
 
 const configuredBaseUrl = publicEnv.NEXT_PUBLIC_API_URL;
-const internalBaseUrl =
-  process.env.API_INTERNAL_URL ??
-  configuredBaseUrl?.replace("://localhost", "://127.0.0.1") ??
-  (isProduction ? undefined : "http://127.0.0.1:4000");
 
 function resolveBaseUrl() {
   if (typeof window !== "undefined") {
     return "";
   }
 
-  if (!internalBaseUrl) {
-    throw new Error("API_INTERNAL_URL or NEXT_PUBLIC_API_URL must be set for server-side API access in production.");
-  }
-
-  return internalBaseUrl;
+  return resolveServerApiOrigin();
 }
 
 export class ApiError extends Error {
@@ -294,7 +286,7 @@ export function getMultiplayerGatewayUrl() {
     return `${window.location.origin.replace(/^http/, "ws")}/api/v1/multiplayer/ws`;
   }
 
-  throw new Error("NEXT_PUBLIC_MULTIPLAYER_GATEWAY_URL or NEXT_PUBLIC_API_URL must be set in production.");
+  throw new Error("NEXT_PUBLIC_MULTIPLAYER_GATEWAY_URL must be set when multiplayer WebSockets use a different public origin in production.");
 }
 
 export function encodeGatewayEvent(event: MultiplayerGatewayClientEvent) {

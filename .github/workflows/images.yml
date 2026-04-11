@@ -1,0 +1,256 @@
+name: Container Images
+
+on:
+  push:
+    branches:
+      - "**"
+    tags:
+      - "v*"
+  pull_request:
+    branches:
+      - "**"
+  workflow_dispatch:
+
+concurrency:
+  group: images-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build-pr-images:
+    name: Build PR Images
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build web image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/docker/web.Dockerfile
+          push: false
+          cache-from: type=gha,scope=web-image
+          cache-to: type=gha,mode=max,scope=web-image
+          provenance: mode=max
+          sbom: true
+
+      - name: Build api image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/docker/api.Dockerfile
+          push: false
+          cache-from: type=gha,scope=api-image
+          cache-to: type=gha,mode=max,scope=api-image
+          provenance: mode=max
+          sbom: true
+
+      - name: Build worker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/docker/worker.Dockerfile
+          push: false
+          cache-from: type=gha,scope=worker-image
+          cache-to: type=gha,mode=max,scope=worker-image
+          provenance: mode=max
+          sbom: true
+
+      - name: Write workflow summary
+        run: |
+          {
+            echo "## Image Refs"
+            echo
+            echo "- PR build only. Images were built but not pushed."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  publish-images:
+    name: Publish Images
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      web_image: ${{ steps.manifest.outputs.web_image }}
+      api_image: ${{ steps.manifest.outputs.api_image }}
+      worker_image: ${{ steps.manifest.outputs.worker_image }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Prepare image names
+        id: names
+        run: |
+          owner="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          repository="$(echo "${GITHUB_REPOSITORY#*/}" | tr '[:upper:]' '[:lower:]')"
+          echo "web_image=${{ env.REGISTRY }}/${owner}/${repository}-web" >> "$GITHUB_OUTPUT"
+          echo "api_image=${{ env.REGISTRY }}/${owner}/${repository}-api" >> "$GITHUB_OUTPUT"
+          echo "worker_image=${{ env.REGISTRY }}/${owner}/${repository}-worker" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare tags
+        id: tags
+        env:
+          WEB_IMAGE: ${{ steps.names.outputs.web_image }}
+          API_IMAGE: ${{ steps.names.outputs.api_image }}
+          WORKER_IMAGE: ${{ steps.names.outputs.worker_image }}
+        run: |
+          short_sha="$(printf '%.12s' "${GITHUB_SHA}")"
+          sha_tag="sha-${short_sha}"
+          published_tags=("${sha_tag}")
+
+          if [ "${GITHUB_REF_TYPE}" = "branch" ]; then
+            sanitized_ref="$(echo "${GITHUB_REF_NAME}" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9._-]+/-/g; s/^-+//; s/-+$//')"
+            published_tags+=("branch-${sanitized_ref}")
+
+            case "${GITHUB_REF_NAME}" in
+              main)
+                published_tags+=("main")
+                ;;
+              staging)
+                published_tags+=("staging")
+                ;;
+              prod|production)
+                published_tags+=("prod")
+                ;;
+            esac
+          fi
+
+          if [ "${GITHUB_REF_TYPE}" = "tag" ] && printf '%s' "${GITHUB_REF_NAME}" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+([.-].*)?$'; then
+            published_tags+=("${GITHUB_REF_NAME}")
+          fi
+
+          to_json() {
+            node -e 'console.log(JSON.stringify(process.argv.slice(1)))' "$@"
+          }
+
+          write_image_tags() {
+            local output_name="$1"
+            local image_name="$2"
+            {
+              echo "${output_name}<<EOF"
+              for tag in "${published_tags[@]}"; do
+                echo "${image_name}:${tag}"
+              done
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          }
+
+          echo "sha_tag=${sha_tag}" >> "$GITHUB_OUTPUT"
+          echo "published_tags_json=$(to_json "${published_tags[@]}")" >> "$GITHUB_OUTPUT"
+          write_image_tags "web_tags" "${WEB_IMAGE}"
+          write_image_tags "api_tags" "${API_IMAGE}"
+          write_image_tags "worker_tags" "${WORKER_IMAGE}"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build web image
+        id: build_web
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/docker/web.Dockerfile
+          push: true
+          tags: ${{ steps.tags.outputs.web_tags }}
+          cache-from: type=gha,scope=web-image
+          cache-to: type=gha,mode=max,scope=web-image
+          provenance: mode=max
+          sbom: true
+
+      - name: Build api image
+        id: build_api
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/docker/api.Dockerfile
+          push: true
+          tags: ${{ steps.tags.outputs.api_tags }}
+          cache-from: type=gha,scope=api-image
+          cache-to: type=gha,mode=max,scope=api-image
+          provenance: mode=max
+          sbom: true
+
+      - name: Build worker image
+        id: build_worker
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/docker/worker.Dockerfile
+          push: true
+          tags: ${{ steps.tags.outputs.worker_tags }}
+          cache-from: type=gha,scope=worker-image
+          cache-to: type=gha,mode=max,scope=worker-image
+          provenance: mode=max
+          sbom: true
+
+      - name: Write image manifest
+        id: manifest
+        run: |
+          mkdir -p deploy/railway
+          web_ref="${{ steps.names.outputs.web_image }}:${{ steps.tags.outputs.sha_tag }}@${{ steps.build_web.outputs.digest }}"
+          api_ref="${{ steps.names.outputs.api_image }}:${{ steps.tags.outputs.sha_tag }}@${{ steps.build_api.outputs.digest }}"
+          worker_ref="${{ steps.names.outputs.worker_image }}:${{ steps.tags.outputs.sha_tag }}@${{ steps.build_worker.outputs.digest }}"
+          cat > deploy/railway/image-manifest.json <<EOF
+          {
+            "gitSha": "${GITHUB_SHA}",
+            "gitShortShaTag": "${{ steps.tags.outputs.sha_tag }}",
+            "generatedAt": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+            "refType": "${GITHUB_REF_TYPE}",
+            "refName": "${GITHUB_REF_NAME}",
+            "images": {
+              "web": {
+                "publishedTags": ${{ steps.tags.outputs.published_tags_json }},
+                "digest": "${{ steps.build_web.outputs.digest }}",
+                "reference": "${web_ref}"
+              },
+              "api": {
+                "publishedTags": ${{ steps.tags.outputs.published_tags_json }},
+                "digest": "${{ steps.build_api.outputs.digest }}",
+                "reference": "${api_ref}"
+              },
+              "worker": {
+                "publishedTags": ${{ steps.tags.outputs.published_tags_json }},
+                "digest": "${{ steps.build_worker.outputs.digest }}",
+                "reference": "${worker_ref}"
+              }
+            }
+          }
+          EOF
+          echo "web_image=${web_ref}" >> "$GITHUB_OUTPUT"
+          echo "api_image=${api_ref}" >> "$GITHUB_OUTPUT"
+          echo "worker_image=${worker_ref}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload image manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: railway-image-manifest
+          path: deploy/railway/image-manifest.json
+          if-no-files-found: error
+
+      - name: Write workflow summary
+        run: |
+          {
+            echo "## Image Refs"
+            echo
+            echo "- web: ${{ steps.manifest.outputs.web_image }}"
+            echo "- api: ${{ steps.manifest.outputs.api_image }}"
+            echo "- worker: ${{ steps.manifest.outputs.worker_image }}"
+          } >> "$GITHUB_STEP_SUMMARY"

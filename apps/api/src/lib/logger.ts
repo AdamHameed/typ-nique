@@ -11,23 +11,33 @@ type JsonLike =
 
 const SENSITIVE_KEY_PATTERN = /(authorization|cookie|password|secret|token|api[-_]?key|set-cookie)/i;
 
-export const logger = pino({
+export const apiLogRedactPaths = [
+  "req.headers.cookie",
+  "req.headers.authorization",
+  "req.headers[\"x-worker-internal-token\"]",
+  "req.headers[\"x-render-admin-token\"]",
+  "req.body.password",
+  "req.body.token",
+  "req.body.secret",
+  "res.headers[\"set-cookie\"]",
+  "headers.cookie",
+  "headers.authorization",
+  "headers[\"x-worker-internal-token\"]",
+  "headers[\"x-render-admin-token\"]",
+  "password",
+  "token",
+  "secret"
+] as const;
+
+export const apiLogger = pino({
   level: env.LOG_LEVEL || (env.NODE_ENV === "development" ? "debug" : env.NODE_ENV === "test" ? "error" : "info"),
   base: {
-    service: "worker",
+    service: "api",
     nodeEnv: env.NODE_ENV
   },
   timestamp: pino.stdTimeFunctions.isoTime,
   redact: {
-    paths: [
-      "headers.cookie",
-      "headers.authorization",
-      "headers[\"x-worker-internal-token\"]",
-      "headers[\"x-render-admin-token\"]",
-      "password",
-      "token",
-      "secret"
-    ],
+    paths: [...apiLogRedactPaths],
     censor: "[Redacted]"
   }
 });
