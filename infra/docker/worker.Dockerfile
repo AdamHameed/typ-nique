@@ -41,7 +41,7 @@ COPY . .
 
 RUN pnpm --filter @typ-nique/db generate
 RUN pnpm --filter @typ-nique/worker build
-RUN pnpm prune --prod
+RUN pnpm --filter @typ-nique/worker deploy --prod /prod/worker
 
 FROM node:22-bookworm-slim AS runtime
 
@@ -56,13 +56,7 @@ ENV PORT=4100
 RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
 
 COPY --from=typst-builder /usr/local/cargo/bin/typst /usr/local/bin/typst
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/package.json ./package.json
-COPY --from=build /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
-COPY --from=build /app/apps/worker/package.json ./apps/worker/package.json
-COPY --from=build /app/apps/worker/dist ./apps/worker/dist
-COPY --from=build /app/packages ./packages
-COPY --from=build /app/prisma ./prisma
+COPY --from=build /prod/worker ./
 
 EXPOSE 4100
 
@@ -71,4 +65,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
 
 USER node
 
-CMD ["node", "apps/worker/dist/index.js"]
+CMD ["node", "dist/index.js"]

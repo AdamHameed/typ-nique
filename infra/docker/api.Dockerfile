@@ -33,7 +33,7 @@ COPY . .
 
 RUN pnpm --filter @typ-nique/db generate
 RUN pnpm --filter @typ-nique/api build
-RUN pnpm prune --prod
+RUN pnpm --filter @typ-nique/api deploy --prod /prod/api
 
 FROM node:22-bookworm-slim AS runtime
 
@@ -47,13 +47,7 @@ ENV PORT=4000
 
 RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
 
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/package.json ./package.json
-COPY --from=build /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
-COPY --from=build /app/apps/api/package.json ./apps/api/package.json
-COPY --from=build /app/apps/api/dist ./apps/api/dist
-COPY --from=build /app/packages ./packages
-COPY --from=build /app/prisma ./prisma
+COPY --from=build /prod/api ./
 COPY --from=build /app/data ./data
 
 EXPOSE 4000
@@ -63,4 +57,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
 
 USER node
 
-CMD ["node", "apps/api/dist/server.js"]
+CMD ["node", "dist/server.js"]
