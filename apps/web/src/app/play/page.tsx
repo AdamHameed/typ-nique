@@ -1,12 +1,13 @@
 import { PlayClient } from "../../components/play-client";
 import { featureFlags } from "../../lib/features";
 
-export default function PlayPage({
+export default async function PlayPage({
   searchParams
 }: {
-  searchParams?: { mode?: string };
+  searchParams?: Promise<{ mode?: string }>;
 }) {
-  const mode = featureFlags.dailyMode && searchParams?.mode === "daily" ? "daily" : "practice";
+  const resolvedSearchParams = await searchParams;
+  const mode = featureFlags.dailyMode && resolvedSearchParams?.mode === "daily" ? "daily" : "practice";
 
   return <PlayClient mode={mode} />;
 }

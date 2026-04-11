@@ -10,7 +10,6 @@ import { loginAccount, registerAccount } from "../lib/api";
 export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const router = useRouter();
   const [identifier, setIdentifier] = useState("");
-  const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
@@ -26,7 +25,6 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
         if (mode === "signup") {
           await registerAccount({
             username,
-            email,
             password,
             displayName: displayName || undefined
           });
@@ -37,7 +35,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
           });
         }
 
-        router.push("/play");
+        router.push(mode === "signup" ? "/" : "/play");
         router.refresh();
       } catch (error) {
         setStatus(error instanceof Error ? error.message : "Authentication failed.");
@@ -61,7 +59,6 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
           <>
             <Input label="Username" value={username} onChange={setUsername} autoComplete="username" />
             <Input label="Display name" value={displayName} onChange={setDisplayName} autoComplete="nickname" optional />
-            <Input label="Email" value={email} onChange={setEmail} type="email" autoComplete="email" />
           </>
         ) : (
           <Input

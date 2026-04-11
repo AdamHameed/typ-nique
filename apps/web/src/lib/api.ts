@@ -6,17 +6,46 @@ import type {
   GameSessionState,
   LeaderboardResponse,
   LeaderboardEntryView,
+  MultiplayerGatewayClientEvent,
+  MultiplayerRoomPreview,
+  MultiplayerRoomReplayData,
+  MultiplayerRoomState,
   PersonalLeaderboardResponse,
   PreviewRenderResponse,
   SubmissionOutcome
 } from "@typ-nique/types";
+import { isProduction, publicEnv } from "./public-env";
 
-const configuredBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
-const internalBaseUrl = process.env.API_INTERNAL_URL ?? configuredBaseUrl.replace("://localhost", "://127.0.0.1");
-const baseUrl = typeof window === "undefined" ? internalBaseUrl : "";
+const configuredBaseUrl = publicEnv.NEXT_PUBLIC_API_URL;
+const internalBaseUrl =
+  process.env.API_INTERNAL_URL ??
+  configuredBaseUrl?.replace("://localhost", "://127.0.0.1") ??
+  (isProduction ? undefined : "http://127.0.0.1:4000");
+
+function resolveBaseUrl() {
+  if (typeof window !== "undefined") {
+    return "";
+  }
+
+  if (!internalBaseUrl) {
+    throw new Error("API_INTERNAL_URL or NEXT_PUBLIC_API_URL must be set for server-side API access in production.");
+  }
+
+  return internalBaseUrl;
+}
+
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
 
 async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${baseUrl}${path}`, {
+  const response = await fetch(`${resolveBaseUrl()}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
@@ -28,13 +57,16 @@ async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!response.ok) {
     const fallbackMessage = `Request failed for ${path}`;
+    let message = fallbackMessage;
 
     try {
       const payload = (await response.json()) as { error?: string; message?: string };
-      throw new Error(payload.message ?? payload.error ?? fallbackMessage);
+      message = payload.message ?? payload.error ?? fallbackMessage;
     } catch {
-      throw new Error(fallbackMessage);
+      // Keep the fallback message.
     }
+
+    throw new ApiError(message, response.status);
   }
 
   return response.json() as Promise<T>;
@@ -115,7 +147,7 @@ export async function previewTypstRender(
   signal?: AbortSignal,
   context?: { sessionId?: string; roundId?: string }
 ) {
-  const response = await fetch(`${baseUrl}/api/v1/render/preview`, {
+  const response = await fetch(`${resolveBaseUrl()}/api/v1/render/preview`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
@@ -150,7 +182,6 @@ export async function getAuthSession() {
 
 export async function registerAccount(payload: {
   username: string;
-  email: string;
   password: string;
   displayName?: string;
 }) {
@@ -176,4 +207,96 @@ export async function logoutAccount() {
 export async function getAuthenticatedHistory(limit = 5) {
   const params = new URLSearchParams({ limit: String(limit) });
   return fetchJson<{ data: PersonalLeaderboardResponse }>(`/api/v1/auth/history?${params.toString()}`);
+}
+
+export async function createMultiplayerRoom(payload: {
+  durationMinutes: number;
+}) {
+  return fetchJson<{ data: MultiplayerRoomState }>("/api/v1/multiplayer/rooms", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function getMultiplayerRoomPreview(roomCode: string) {
+  return fetchJson<{ data: MultiplayerRoomPreview }>(`/api/v1/multiplayer/rooms/code/${encodeURIComponent(roomCode)}`);
+}
+
+export async function getMultiplayerRoomSnapshot(roomCode: string) {
+  return fetchJson<{ data: MultiplayerRoomState }>(`/api/v1/multiplayer/rooms/code/${encodeURIComponent(roomCode)}/snapshot`);
+}
+
+export async function joinMultiplayerRoom(roomCode: string, roomVersion?: number) {
+  return fetchJson<{ data: MultiplayerRoomState }>(`/api/v1/multiplayer/rooms/code/${encodeURIComponent(roomCode)}/join`, {
+    method: "POST",
+    body: JSON.stringify(roomVersion !== undefined ? { roomVersion } : {})
+  });
+}
+
+export async function leaveMultiplayerRoom(matchId: string, roomVersion?: number) {
+  return fetchJson<{ data: MultiplayerRoomState }>(`/api/v1/multiplayer/rooms/${encodeURIComponent(matchId)}/leave`, {
+    method: "POST",
+    body: JSON.stringify(roomVersion !== undefined ? { roomVersion } : {})
+  });
+}
+
+export async function setMultiplayerReady(matchId: string, ready: boolean, roomVersion?: number) {
+  if (!ready) {
+    return fetchJson<{ data: MultiplayerRoomState }>(`/api/v1/multiplayer/rooms/${encodeURIComponent(matchId)}/unready`, {
+      method: "POST",
+      body: JSON.stringify(roomVersion !== undefined ? { roomVersion } : {})
+    });
+  }
+
+  return fetchJson<{ data: MultiplayerRoomState }>(`/api/v1/multiplayer/rooms/${encodeURIComponent(matchId)}/ready`, {
+    method: "POST",
+    body: JSON.stringify({
+      ready: true,
+      ...(roomVersion !== undefined ? { roomVersion } : {})
+    })
+  });
+}
+
+export async function startMultiplayerCountdown(matchId: string, roomVersion?: number) {
+  return fetchJson<{ data: MultiplayerRoomState }>(`/api/v1/multiplayer/rooms/${encodeURIComponent(matchId)}/start`, {
+    method: "POST",
+    body: JSON.stringify(roomVersion !== undefined ? { roomVersion } : {})
+  });
+}
+
+export async function resetMultiplayerRoom(matchId: string, roomVersion?: number) {
+  return fetchJson<{ data: MultiplayerRoomState }>(`/api/v1/multiplayer/rooms/${encodeURIComponent(matchId)}/reset`, {
+    method: "POST",
+    body: JSON.stringify(roomVersion !== undefined ? { roomVersion } : {})
+  });
+}
+
+export async function getMultiplayerRoomResults(matchId: string, includeDiagnostics = false) {
+  const params = new URLSearchParams();
+
+  if (includeDiagnostics) {
+    params.set("includeDiagnostics", "true");
+  }
+
+  return fetchJson<{ data: MultiplayerRoomReplayData }>(
+    `/api/v1/multiplayer/rooms/${encodeURIComponent(matchId)}/results${params.size > 0 ? `?${params.toString()}` : ""}`
+  );
+}
+
+export function getMultiplayerGatewayUrl() {
+  const configuredGatewayBaseUrl = publicEnv.NEXT_PUBLIC_MULTIPLAYER_GATEWAY_URL ?? configuredBaseUrl;
+
+  if (configuredGatewayBaseUrl) {
+    return `${configuredGatewayBaseUrl.replace(/^http/, "ws")}/api/v1/multiplayer/ws`;
+  }
+
+  if (typeof window !== "undefined") {
+    return `${window.location.origin.replace(/^http/, "ws")}/api/v1/multiplayer/ws`;
+  }
+
+  throw new Error("NEXT_PUBLIC_MULTIPLAYER_GATEWAY_URL or NEXT_PUBLIC_API_URL must be set in production.");
+}
+
+export function encodeGatewayEvent(event: MultiplayerGatewayClientEvent) {
+  return JSON.stringify(event);
 }

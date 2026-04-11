@@ -6,6 +6,7 @@ import { ThemeToggle } from "./theme-toggle";
 
 const navItems = [
   { href: "/play", label: "Play" },
+  { href: "/multiplayer", label: "Multiplayer" },
   { href: "/leaderboard", label: "Leaderboard" }
 ] as const;
 
@@ -19,7 +20,7 @@ export function SiteShell({ children }: PropsWithChildren) {
             <p className="texnique-shell-tagline">A Typst Typesetting Game</p>
           </div>
           <nav className="texnique-shell-nav">
-            {navItems.slice(0, 1).map((item) => (
+            {navItems.slice(0, 2).map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
@@ -33,7 +34,7 @@ export function SiteShell({ children }: PropsWithChildren) {
                 Daily
               </Link>
             ) : null}
-            {navItems.slice(1).map((item) => (
+            {navItems.slice(2).map((item) => (
               <Link
                 key={item.href}
                 href={item.href}

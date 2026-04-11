@@ -2,9 +2,10 @@ import type { FastifyInstance } from "fastify";
 import { compareRenderedOutput } from "@typ-nique/checker";
 import type { ChallengePrompt, PreviewRenderResponse } from "@typ-nique/types";
 import { previewRenderSchema } from "@typ-nique/validation";
-import { buildRateLimitKey, checkRateLimit } from "../lib/rate-limit.js";
+import { applyRateLimitHeaders, buildRateLimitKey, checkRateLimit } from "../lib/rate-limit.js";
 import { resolveAuthContext } from "../lib/auth.js";
 import { env } from "../lib/env.js";
+import { logSecurityEvent } from "../lib/security-observability.js";
 import { prisma } from "../lib/prisma.js";
 
 export async function renderRoutes(app: FastifyInstance) {
@@ -16,8 +17,21 @@ export async function renderRoutes(app: FastifyInstance) {
       env.PREVIEW_RATE_LIMIT_MAX,
       env.PREVIEW_RATE_LIMIT_WINDOW_MS
     );
+    applyRateLimitHeaders(reply, limiter, {
+      limit: env.PREVIEW_RATE_LIMIT_MAX,
+      windowMs: env.PREVIEW_RATE_LIMIT_WINDOW_MS
+    });
 
     if (!limiter.allowed) {
+      logSecurityEvent("preview-rate-limit-exceeded", {
+        requestId: request.id,
+        ip: request.ip,
+        actor: {
+          userId: auth.userId,
+          playerSessionId: auth.playerSessionId
+        }
+      });
+
       return reply.code(429).send({
         ok: false,
         errorCode: "RATE_LIMITED",
@@ -139,7 +153,7 @@ async function getPreviewComparisonPrompt(input: {
         : round.challenge.difficulty === 2
           ? "medium"
           : "hard",
-    inputMode: round.challenge.category.slug === "text-formatting" ? "text" : "math",
+    inputMode: "math",
     canonicalSource: round.challenge.canonicalSource,
     normalizedCanonicalSource: round.challenge.normalizedCanonicalSource,
     renderedSvg: round.challenge.canonicalArtifact.svgInline ?? "",

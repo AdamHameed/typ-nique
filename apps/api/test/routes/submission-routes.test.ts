@@ -12,10 +12,14 @@ vi.mock("../../src/lib/auth.js", () => ({
   resolveAuthContext: mocks.resolveAuthContext
 }));
 
-vi.mock("../../src/lib/rate-limit.js", () => ({
-  buildRateLimitKey: mocks.buildRateLimitKey,
-  checkRateLimit: mocks.checkRateLimit
-}));
+vi.mock("../../src/lib/rate-limit.js", async () => {
+  const actual = await vi.importActual<typeof import("../../src/lib/rate-limit.js")>("../../src/lib/rate-limit.js");
+  return {
+    ...actual,
+    buildRateLimitKey: mocks.buildRateLimitKey,
+    checkRateLimit: mocks.checkRateLimit
+  };
+});
 
 vi.mock("../../src/lib/env.js", () => ({
   env: {
@@ -104,6 +108,25 @@ describe("submissionRoutes", () => {
     expect(response.statusCode).toBe(429);
     expect(response.json()).toEqual({
       error: "Submission rate limit reached. Please wait a moment and try again."
+    });
+  });
+
+  it("returns a multiplayer-safe 429 when the race limiter rejects a submission", async () => {
+    mocks.submitAttempt.mockRejectedValue(new Error("Multiplayer submission rate limit reached."));
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/submissions",
+      payload: {
+        sessionId: "8d6610d7-73af-4ce8-9448-6f6a486f0011",
+        roundId: "8d6610d7-73af-4ce8-9448-6f6a486f0022",
+        source: "x^2 + y^2 = z^2"
+      }
+    });
+
+    expect(response.statusCode).toBe(429);
+    expect(response.json()).toEqual({
+      error: "Race submission rate limit reached. Please slow down and try again."
     });
   });
 });

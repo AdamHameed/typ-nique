@@ -1,8 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import { submitAttemptSchema } from "@typ-nique/validation";
 import { resolveAuthContext } from "../lib/auth.js";
-import { buildRateLimitKey, checkRateLimit } from "../lib/rate-limit.js";
+import { applyRateLimitHeaders, buildRateLimitKey, checkRateLimit } from "../lib/rate-limit.js";
 import { env } from "../lib/env.js";
+import { logSecurityEvent } from "../lib/security-observability.js";
 import { submitAttempt } from "../services/submission-service.js";
 
 export async function submissionRoutes(app: FastifyInstance) {
@@ -14,8 +15,21 @@ export async function submissionRoutes(app: FastifyInstance) {
       env.SUBMISSION_RATE_LIMIT_MAX,
       env.SUBMISSION_RATE_LIMIT_WINDOW_MS
     );
+    applyRateLimitHeaders(reply, limiter, {
+      limit: env.SUBMISSION_RATE_LIMIT_MAX,
+      windowMs: env.SUBMISSION_RATE_LIMIT_WINDOW_MS
+    });
 
     if (!limiter.allowed) {
+      logSecurityEvent("submission-rate-limit-exceeded", {
+        requestId: request.id,
+        ip: request.ip,
+        actor: {
+          userId: auth.userId,
+          playerSessionId: auth.playerSessionId
+        }
+      });
+
       return reply.code(429).send({
         error: "Submission rate limit reached. Please wait a moment and try again."
       });
@@ -29,6 +43,12 @@ export async function submissionRoutes(app: FastifyInstance) {
 
       return reply.code(200).send({ data: result });
     } catch (error) {
+      if (error instanceof Error && error.message === "Multiplayer submission rate limit reached.") {
+        return reply.code(429).send({
+          error: "Race submission rate limit reached. Please slow down and try again."
+        });
+      }
+
       if (error instanceof Error && error.message === "Round not accessible.") {
         return reply.code(403).send({ error: error.message });
       }

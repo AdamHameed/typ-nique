@@ -1,4 +1,5 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
+import type { IncomingHttpHeaders } from "node:http";
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { prisma } from "./prisma.js";
 import { env } from "./env.js";
@@ -23,7 +24,11 @@ const GUEST_COOKIE_NAME = env.GUEST_COOKIE_NAME;
 const SESSION_TTL_MS = env.AUTH_SESSION_TTL_DAYS * 24 * 60 * 60 * 1000;
 
 export async function resolveAuthContext(request: FastifyRequest): Promise<RequestAuthContext> {
-  const cookies = parseCookies(request.headers.cookie);
+  return resolveAuthContextFromHeaders(request.headers);
+}
+
+export async function resolveAuthContextFromHeaders(headers: IncomingHttpHeaders): Promise<RequestAuthContext> {
+  const cookies = parseCookies(headers.cookie);
   const authToken = cookies[AUTH_COOKIE_NAME];
   const guestToken = cookies[GUEST_COOKIE_NAME];
 
@@ -224,7 +229,11 @@ function parseCookies(header?: string) {
       continue;
     }
 
-    cookies[rawKey] = decodeURIComponent(rawValue.join("="));
+    try {
+      cookies[rawKey] = decodeURIComponent(rawValue.join("="));
+    } catch {
+      continue;
+    }
   }
 
   return cookies;

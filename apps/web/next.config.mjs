@@ -1,20 +1,49 @@
-const apiOrigin =
-  process.env.API_INTERNAL_URL ??
-  process.env.NEXT_PUBLIC_API_URL ??
-  "http://127.0.0.1:4000";
+const isProduction = process.env.NODE_ENV === "production";
+const securityHeaders = [
+  {
+    key: "Referrer-Policy",
+    value: "strict-origin-when-cross-origin"
+  },
+  {
+    key: "X-Content-Type-Options",
+    value: "nosniff"
+  },
+  {
+    key: "X-Frame-Options",
+    value: "DENY"
+  },
+  {
+    key: "Permissions-Policy",
+    value: "camera=(), microphone=(), geolocation=()"
+  },
+  {
+    key: "Cross-Origin-Opener-Policy",
+    value: "same-origin"
+  },
+  {
+    key: "Cross-Origin-Resource-Policy",
+    value: "same-site"
+  }
+];
+
+if (isProduction) {
+  securityHeaders.push({
+    key: "Strict-Transport-Security",
+    value: "max-age=31536000; includeSubDomains"
+  });
+}
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
-  experimental: {
-    typedRoutes: true
-  },
+  typedRoutes: true,
+  poweredByHeader: false,
   transpilePackages: ["@typ-nique/ui", "@typ-nique/types"],
-  async rewrites() {
+  async headers() {
     return [
       {
-        source: "/api/v1/:path*",
-        destination: `${apiOrigin}/api/v1/:path*`
+        source: "/:path*",
+        headers: securityHeaders
       }
     ];
   }

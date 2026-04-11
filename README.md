@@ -114,11 +114,12 @@ That command does a full clean Docker restart:
 - starts `web`, `api`, `worker`, `postgres`, and `redis`
 
 The compose stack also runs a one-shot `setup` container first to generate Prisma, apply migrations, and seed the database.
+That compose file is development-only and intentionally keeps bind mounts and `env_file` usage isolated from production deployment paths.
 
 If you need to rerun the container bootstrap manually:
 
 ```bash
-docker compose -f infra/compose/docker-compose.yml run --rm setup
+docker compose -f infra/compose/docker-compose.dev.yml run --rm setup
 ```
 
 ## Troubleshooting
@@ -133,4 +134,5 @@ docker compose -f infra/compose/docker-compose.yml run --rm setup
 - [Challenge content system](/Users/adam/Downloads/Projects/typ-nique/docs/challenge-content-system.md)
 - [Typst rendering service](/Users/adam/Downloads/Projects/typ-nique/docs/typst-rendering-service.md)
 - [Advanced answer checker](/Users/adam/Downloads/Projects/typ-nique/docs/advanced-answer-checker.md)
+- [Production security hardening](/Users/adam/Downloads/Projects/typ-nique/docs/production-security.md)
 - [Railway deployment](/Users/adam/Downloads/Projects/typ-nique/docs/railway-deployment.md)

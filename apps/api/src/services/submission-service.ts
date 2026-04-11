@@ -1,16 +1,32 @@
 import { compareRenderedOutput, normalizeSource, runStaticCheck } from "@typ-nique/checker";
 import { normalizeSvgMarkup, svgFingerprint } from "@typ-nique/typst-utils";
-import type { MatchTier, PreviewRenderResponse, SubmissionOutcome } from "@typ-nique/types";
+import {
+  calculateStreakMultiplier,
+  calculateTypstSourceBasePoints,
+  type MatchTier,
+  type PreviewRenderResponse,
+  type SubmissionOutcome
+} from "@typ-nique/types";
 import { createHash } from "node:crypto";
 import { env } from "../lib/env.js";
+import { buildRateLimitKey, checkRateLimit } from "../lib/rate-limit.js";
+import { logSecurityEvent } from "../lib/security-observability.js";
 import { prisma } from "../lib/prisma.js";
 import { renderQueue } from "../lib/queue.js";
 import { getChallengeById } from "./challenge-service.js";
 import { ensureSessionProgression, getGameSessionState } from "./game-service.js";
+import { notifyMultiplayerRoundResolved } from "./multiplayer-service.js";
 import { scoreSubmission } from "./scoring.js";
+import { buildDuplicateSubmissionOutcome as buildDuplicateSubmissionOutcomeFromRecord } from "./submission-dedup.js";
 
 const RENDER_WAIT_TIMEOUT_MS = 4500;
 const RENDER_WAIT_INTERVAL_MS = 150;
+const DUPLICATE_SUBMISSION_WINDOW_MS = 10_000;
+const SUSPICIOUS_FAST_SOLVE_MS = 750;
+const MULTIPLAYER_SUBMISSION_RATE_LIMIT_WINDOW_MS = 30_000;
+const MULTIPLAYER_SUBMISSION_RATE_LIMIT_MAX = 18;
+const COMPILE_SPAM_LOOKBACK_MS = 60_000;
+const COMPILE_SPAM_THRESHOLD = 5;
 
 export async function submitAttempt(input: {
   sessionId: string;
@@ -21,6 +37,9 @@ export async function submitAttempt(input: {
     playerSessionId: string | null;
   };
 }): Promise<SubmissionOutcome> {
+  const trimmedSource = input.source.trim();
+  const normalizedSource = normalizeSource(trimmedSource);
+  const sourceHash = createHash("sha256").update(trimmedSource).digest("hex");
   const round = await prisma.gameRound.findUnique({
     where: { id: input.roundId },
     include: { challenge: true, gameSession: true }
@@ -34,7 +53,17 @@ export async function submitAttempt(input: {
     !(input.actor.userId && round.gameSession.userId === input.actor.userId) &&
     !(input.actor.playerSessionId && round.gameSession.playerSessionId === input.actor.playerSessionId)
   ) {
+    await auditSuspiciousSubmissionPattern("round-access-denied", {
+      sessionId: input.sessionId,
+      roundId: input.roundId,
+      actor: input.actor
+    });
     throw new Error("Round not accessible.");
+  }
+
+  if (round.gameSession.matchId) {
+    await assertMultiplayerSubmissionAccess(round.gameSession.matchId, round.gameSessionId, input.actor);
+    enforceMultiplayerSubmissionRateLimit(round.gameSession.matchId, input.actor);
   }
 
   if (round.gameSession.status !== "ACTIVE") {
@@ -50,6 +79,24 @@ export async function submitAttempt(input: {
     };
   }
 
+  const duplicateSubmission = await findDuplicateSubmission(round.id, sourceHash);
+
+  if (duplicateSubmission) {
+    await auditSuspiciousSubmissionPattern("duplicate-submission", {
+      sessionId: round.gameSessionId,
+      roundId: round.id,
+      actor: input.actor,
+      attemptNumber: duplicateSubmission.attemptNumber
+    });
+
+    return buildDuplicateSubmissionOutcome({
+      submission: duplicateSubmission,
+      source: trimmedSource,
+      actor: input.actor,
+      sessionId: round.gameSessionId
+    });
+  }
+
   const prompt = await getChallengeById(round.challengeId);
 
   if (!prompt) {
@@ -63,9 +110,9 @@ export async function submitAttempt(input: {
     data: {
       gameRoundId: round.id,
       attemptNumber,
-      rawSource: input.source,
-      normalizedSource: normalizeSource(input.source),
-      sourceHash: createHash("sha256").update(input.source).digest("hex"),
+      rawSource: trimmedSource,
+      normalizedSource,
+      sourceHash,
       checkerVersion: 1,
       verdict: staticResult.verdict === "correct" ? "CORRECT" : "INCORRECT",
       matchTier: staticResult.matchTier.toUpperCase() as
@@ -87,9 +134,14 @@ export async function submitAttempt(input: {
       actor: input.actor,
       incrementAttempted: true,
       scoreMetadata: {
-        difficulty: round.challenge.difficulty,
         source: "static"
       }
+    });
+
+    await auditResolvedSubmission(round, {
+      matchTier: staticResult.matchTier,
+      source: "static",
+      attemptNumber
     });
 
     return {
@@ -116,6 +168,10 @@ export async function submitAttempt(input: {
   });
 
   if (directRenderResult) {
+    if (directRenderResult.verdict === "compile_error") {
+      await auditCompileSpam(round.gameSessionId, round.id, round.gameSession.matchId, input.actor);
+    }
+
     if (directRenderResult.verdict === "correct") {
       const { scoreAwarded, sessionState } = await acceptResolvedSubmission({
         round,
@@ -125,9 +181,14 @@ export async function submitAttempt(input: {
         incrementAttempted: false,
         scoreMetadata: {
           matchTier: directRenderResult.matchTier,
-          difficulty: round.challenge.difficulty,
           source: "direct-render"
         }
+      });
+
+      await auditResolvedSubmission(round, {
+        matchTier: directRenderResult.matchTier,
+        source: "direct-render",
+        attemptNumber
       });
 
       return {
@@ -178,6 +239,24 @@ export async function submitAttempt(input: {
     });
 
     await ensureSessionProgression(round.gameSessionId);
+
+    if (round.gameSession.matchId) {
+      await notifyMultiplayerRoundResolved(round.gameSession.matchId, {
+        sessionId: round.gameSessionId,
+        roundId: round.id,
+        reason: "worker-round-resolved"
+      });
+    }
+
+    await auditResolvedSubmission(round, {
+      matchTier: resolvedSubmission.matchTier.toLowerCase() as MatchTier,
+      source: "worker",
+      attemptNumber
+    });
+  }
+
+  if (resolvedSubmission.verdict === "COMPILE_ERROR") {
+    await auditCompileSpam(round.gameSessionId, round.id, round.gameSession.matchId, input.actor);
   }
 
   const refreshedRound = await prisma.gameRound.findUnique({
@@ -326,9 +405,10 @@ async function acceptResolvedSubmission(input: {
   round: {
     id: string;
     gameSessionId: string;
+    position: number;
     presentedAt: Date;
     challenge: {
-      difficulty: number;
+      canonicalSource: string;
     };
     gameSession: {
       userId: string | null;
@@ -343,7 +423,10 @@ async function acceptResolvedSubmission(input: {
   incrementAttempted: boolean;
   scoreMetadata?: Record<string, unknown>;
 }) {
-  const scoreAwarded = scoreSubmission(input.round.challenge.difficulty, input.round.presentedAt);
+  const streak = await getSessionStreakBeforeRound(input.round.gameSessionId, input.round.position);
+  const basePoints = calculateTypstSourceBasePoints(input.round.challenge.canonicalSource);
+  const streakMultiplier = calculateStreakMultiplier(streak);
+  const scoreAwarded = scoreSubmission(input.round.challenge.canonicalSource, streak);
 
   await prisma.gameRound.update({
     where: { id: input.round.id },
@@ -375,18 +458,72 @@ async function acceptResolvedSubmission(input: {
       points: scoreAwarded,
       metadata: {
         matchTier: input.matchTier,
+        basePoints,
+        streak,
+        streakMultiplier,
         ...(input.scoreMetadata ?? {})
       }
     }
   });
 
   await ensureSessionProgression(input.round.gameSessionId);
+  const refreshedSession = await prisma.gameSession.findUnique({
+    where: { id: input.round.gameSessionId },
+    select: { matchId: true }
+  });
+
+  if (refreshedSession?.matchId) {
+    await notifyMultiplayerRoundResolved(refreshedSession.matchId, {
+      sessionId: input.round.gameSessionId,
+      roundId: input.round.id,
+      reason: "submission-accepted"
+    });
+  }
+
   const sessionState = await getGameSessionState(input.round.gameSessionId, input.actor);
 
   return {
     scoreAwarded,
     sessionState
   };
+}
+
+async function getSessionStreakBeforeRound(sessionId: string, roundPosition: number) {
+  const priorRounds = await prisma.gameRound.findMany({
+    where: {
+      gameSessionId: sessionId,
+      position: {
+        lt: roundPosition
+      },
+      resolvedAt: {
+        not: null
+      }
+    },
+    orderBy: {
+      position: "desc"
+    },
+    select: {
+      finalVerdict: true,
+      metadata: true
+    }
+  });
+
+  let streak = 0;
+
+  for (const round of priorRounds) {
+    const skipped = Boolean(
+      round.metadata && typeof round.metadata === "object" && "skipped" in round.metadata && (round.metadata as { skipped?: unknown }).skipped
+    );
+
+    if (round.finalVerdict === "CORRECT" && !skipped) {
+      streak += 1;
+      continue;
+    }
+
+    break;
+  }
+
+  return streak;
 }
 
 async function waitForRenderVerdict(submissionId: string) {
@@ -410,4 +547,171 @@ async function waitForRenderVerdict(submissionId: string) {
   }
 
   return null;
+}
+
+async function assertMultiplayerSubmissionAccess(
+  matchId: string,
+  gameSessionId: string,
+  actor: {
+    userId: string | null;
+    playerSessionId: string | null;
+  }
+) {
+  const membership = await prisma.multiplayerMatchPlayer.findFirst({
+    where: {
+      matchId,
+      leftAt: null,
+      ...(actor.userId ? { userId: actor.userId } : { playerSessionId: actor.playerSessionId ?? undefined })
+    }
+  });
+
+  if (!membership || membership.gameSessionId !== gameSessionId) {
+    await auditSuspiciousSubmissionPattern("multiplayer-membership-mismatch", {
+      matchId,
+      sessionId: gameSessionId,
+      actor
+    });
+    throw new Error("Round not accessible.");
+  }
+}
+
+function enforceMultiplayerSubmissionRateLimit(
+  matchId: string,
+  actor: {
+    userId: string | null;
+    playerSessionId: string | null;
+  }
+) {
+  const limiter = checkRateLimit(
+    buildRateLimitKey(`multiplayer-submission:${matchId}`, actor.userId ?? actor.playerSessionId, "anonymous"),
+    Math.min(env.SUBMISSION_RATE_LIMIT_MAX, MULTIPLAYER_SUBMISSION_RATE_LIMIT_MAX),
+    Math.min(env.SUBMISSION_RATE_LIMIT_WINDOW_MS, MULTIPLAYER_SUBMISSION_RATE_LIMIT_WINDOW_MS)
+  );
+
+  if (!limiter.allowed) {
+    void auditSuspiciousSubmissionPattern("multiplayer-rate-limit-exceeded", {
+      matchId,
+      actor,
+      limit: Math.min(env.SUBMISSION_RATE_LIMIT_MAX, MULTIPLAYER_SUBMISSION_RATE_LIMIT_MAX),
+      windowMs: Math.min(env.SUBMISSION_RATE_LIMIT_WINDOW_MS, MULTIPLAYER_SUBMISSION_RATE_LIMIT_WINDOW_MS)
+    });
+    throw new Error("Multiplayer submission rate limit reached.");
+  }
+}
+
+async function findDuplicateSubmission(roundId: string, sourceHash: string) {
+  const submission = await prisma.submission.findFirst({
+    where: {
+      gameRoundId: roundId,
+      sourceHash
+    },
+    orderBy: { submittedAt: "desc" }
+  });
+
+  if (!submission) {
+    return null;
+  }
+
+  return Date.now() - submission.submittedAt.getTime() <= DUPLICATE_SUBMISSION_WINDOW_MS ? submission : null;
+}
+
+async function buildDuplicateSubmissionOutcome(input: {
+  submission: {
+    verdict: "CORRECT" | "INCORRECT" | "COMPILE_ERROR" | "TIMEOUT";
+    matchTier: "EXACT" | "NORMALIZED" | "RENDERED" | "ALTERNATE" | "NONE";
+    normalizedSource: string;
+    feedback: string | null;
+    compileError: string | null;
+    renderFingerprint: string | null;
+    isAccepted: boolean;
+  };
+  source: string;
+  actor: {
+    userId: string | null;
+    playerSessionId: string | null;
+  };
+  sessionId: string;
+}): Promise<SubmissionOutcome> {
+  const sessionState = await getGameSessionState(input.sessionId, input.actor);
+  return buildDuplicateSubmissionOutcomeFromRecord({
+    submission: input.submission,
+    sessionState: sessionState ?? undefined
+  });
+}
+
+async function auditResolvedSubmission(
+  round: {
+    id: string;
+    gameSessionId: string;
+    presentedAt: Date;
+    gameSession: {
+      matchId: string | null;
+    };
+  },
+  input: {
+    matchTier: MatchTier;
+    source: "static" | "direct-render" | "worker";
+    attemptNumber: number;
+  }
+) {
+  const elapsedMs = Date.now() - round.presentedAt.getTime();
+
+  if (elapsedMs <= SUSPICIOUS_FAST_SOLVE_MS) {
+    await auditSuspiciousSubmissionPattern("suspicious-fast-solve", {
+      sessionId: round.gameSessionId,
+      roundId: round.id,
+      matchId: round.gameSession.matchId,
+      elapsedMs,
+      source: input.source,
+      matchTier: input.matchTier,
+      attemptNumber: input.attemptNumber
+    });
+  }
+
+  if (input.attemptNumber >= 12) {
+    await auditSuspiciousSubmissionPattern("high-attempt-volume", {
+      sessionId: round.gameSessionId,
+      roundId: round.id,
+      matchId: round.gameSession.matchId,
+      attemptNumber: input.attemptNumber,
+      source: input.source
+    });
+  }
+}
+
+async function auditCompileSpam(
+  sessionId: string,
+  roundId: string,
+  matchId: string | null,
+  actor: {
+    userId: string | null;
+    playerSessionId: string | null;
+  }
+) {
+  const compileErrors = await prisma.submission.count({
+    where: {
+      gameRound: {
+        gameSessionId: sessionId
+      },
+      verdict: "COMPILE_ERROR",
+      submittedAt: {
+        gte: new Date(Date.now() - COMPILE_SPAM_LOOKBACK_MS)
+      }
+    }
+  });
+
+  if (compileErrors >= COMPILE_SPAM_THRESHOLD) {
+    await auditSuspiciousSubmissionPattern("compile-spam", {
+      matchId,
+      sessionId,
+      roundId,
+      actor,
+      compileErrors,
+      lookbackMs: COMPILE_SPAM_LOOKBACK_MS
+    });
+  }
+}
+
+async function auditSuspiciousSubmissionPattern(event: string, payload: Record<string, unknown>) {
+  logSecurityEvent(event, payload, "warn");
 }

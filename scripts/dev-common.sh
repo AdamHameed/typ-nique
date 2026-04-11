@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-COMPOSE_FILE="$ROOT_DIR/infra/compose/docker-compose.yml"
+COMPOSE_FILE="$ROOT_DIR/infra/compose/docker-compose.dev.yml"
 APP_PORTS=(3000 4000 4100)
 PROCESS_PATTERNS=(
   "tsx watch src/server.ts"
   "tsx watch src/index.ts"
-  "next dev --hostname 0.0.0.0 --port 3000"
+  "next dev --hostname 0.0.0.0"
   "node dist/server.js"
   "node dist/index.js"
+  "tsx dist/server.js"
+  "tsx dist/index.js"
   "next-server"
 )
 

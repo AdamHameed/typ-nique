@@ -1,4 +1,5 @@
 import { compareRenderedOutput, normalizeSource } from "@typ-nique/checker";
+import { calculateRoundPointValue, calculateStreakMultiplier, calculateTypstSourceBasePoints } from "@typ-nique/types";
 import { normalizeSvgMarkup, svgFingerprint } from "@typ-nique/typst-utils";
 import { prisma } from "@typ-nique/db";
 import { enqueueRenderCheckSchema } from "@typ-nique/validation";
@@ -107,7 +108,10 @@ export async function handleRenderCheckJob(payload: unknown) {
       }
     });
 
-    const points = scoreSubmission(round.challenge.difficulty, round.presentedAt);
+    const streak = await getSessionStreakBeforeRound(round.gameSessionId, round.position);
+    const points = calculateRoundPointValue(round.challenge.canonicalSource, streak);
+    const basePoints = calculateTypstSourceBasePoints(round.challenge.canonicalSource);
+    const streakMultiplier = calculateStreakMultiplier(streak);
 
     await prisma.gameSession.update({
       where: { id: round.gameSessionId },
@@ -133,6 +137,9 @@ export async function handleRenderCheckJob(payload: unknown) {
         scoreType: "ROUND",
         points,
         metadata: {
+          basePoints,
+          streak,
+          streakMultiplier,
           matchTier: comparison.matchTier,
           source: "worker"
         }
@@ -147,10 +154,40 @@ export async function handleRenderCheckJob(payload: unknown) {
   };
 }
 
-function scoreSubmission(difficulty: number, presentedAt: Date) {
-  const difficultyBase = difficulty <= 1 ? 100 : difficulty === 2 ? 150 : 220;
-  const elapsedSeconds = Math.max(1, (Date.now() - presentedAt.getTime()) / 1000);
-  const speedBonus = Math.max(0.55, Math.min(1.25, 20 / elapsedSeconds));
+async function getSessionStreakBeforeRound(sessionId: string, roundPosition: number) {
+  const priorRounds = await prisma.gameRound.findMany({
+    where: {
+      gameSessionId: sessionId,
+      position: {
+        lt: roundPosition
+      },
+      resolvedAt: {
+        not: null
+      }
+    },
+    orderBy: {
+      position: "desc"
+    },
+    select: {
+      finalVerdict: true,
+      metadata: true
+    }
+  });
 
-  return Math.round(difficultyBase * speedBonus);
+  let streak = 0;
+
+  for (const round of priorRounds) {
+    const skipped = Boolean(
+      round.metadata && typeof round.metadata === "object" && "skipped" in round.metadata && (round.metadata as { skipped?: unknown }).skipped
+    );
+
+    if (round.finalVerdict === "CORRECT" && !skipped) {
+      streak += 1;
+      continue;
+    }
+
+    break;
+  }
+
+  return streak;
 }
