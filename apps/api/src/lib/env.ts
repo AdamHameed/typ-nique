@@ -2,6 +2,10 @@ import { parseServiceEnv } from "@typ-nique/validation";
 import { z } from "zod";
 import { parseAllowedBrowserOrigins } from "./browser-origin.js";
 
+function firstDefinedEnv(...values: Array<string | undefined>) {
+  return values.find((value) => value !== undefined);
+}
+
 const optionalString = z.preprocess((value) => {
   if (typeof value === "string" && value.trim() === "") {
     return undefined;
@@ -80,7 +84,12 @@ const envSchema = z.object({
   SUBMISSION_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(90)
 });
 
-const parsedEnv = parseServiceEnv("api", envSchema, process.env);
+const parsedEnv = parseServiceEnv("api", envSchema, {
+  ...process.env,
+  DATABASE_URL: firstDefinedEnv(process.env.DATABASE_URL, process.env.DATABASE_PRIVATE_URL, process.env.DATABASE_PUBLIC_URL),
+  REDIS_URL: firstDefinedEnv(process.env.REDIS_URL, process.env.REDIS_PRIVATE_URL, process.env.REDIS_PUBLIC_URL),
+  WORKER_RENDER_URL: firstDefinedEnv(process.env.WORKER_RENDER_URL, process.env.WORKER_PRIVATE_URL)
+});
 const defaultWorkerRenderUrl = parsedEnv.NODE_ENV === "production" ? undefined : "http://127.0.0.1:4100";
 const workerRenderUrl = parsedEnv.WORKER_RENDER_URL ?? defaultWorkerRenderUrl;
 const authCookieSecure = parsedEnv.AUTH_COOKIE_SECURE ?? parsedEnv.NODE_ENV === "production";

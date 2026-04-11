@@ -1,5 +1,13 @@
 import { z } from "zod";
 
+function formatEnvIssuePath(issue: z.ZodIssue) {
+  return issue.path.join(".") || "<root>";
+}
+
+function formatEnvIssueSummary(issue: z.ZodIssue) {
+  return `${formatEnvIssuePath(issue)}: ${issue.message}`;
+}
+
 export function parseServiceEnv<TSchema extends z.ZodTypeAny>(
   service: string,
   schema: TSchema,
@@ -17,13 +25,15 @@ export function parseServiceEnv<TSchema extends z.ZodTypeAny>(
       event: "invalid-env",
       service,
       issues: parsed.error.issues.map((issue) => ({
-        path: issue.path.join(".") || "<root>",
+        path: formatEnvIssuePath(issue),
         message: issue.message
       }))
     })}\n`
   );
 
-  throw new Error(`Invalid ${service} environment configuration.`);
+  throw new Error(
+    `Invalid ${service} environment configuration: ${parsed.error.issues.map(formatEnvIssueSummary).join("; ")}`
+  );
 }
 
 export const createGameSessionSchema = z.object({

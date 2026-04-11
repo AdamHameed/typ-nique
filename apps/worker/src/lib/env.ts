@@ -2,6 +2,10 @@ import { parseServiceEnv } from "@typ-nique/validation";
 import path from "node:path";
 import { z } from "zod";
 
+function firstDefinedEnv(...values: Array<string | undefined>) {
+  return values.find((value) => value !== undefined);
+}
+
 const optionalNumber = z.preprocess((value) => {
   if (value === "" || value === undefined || value === null) {
     return undefined;
@@ -59,7 +63,10 @@ const envSchema = z.object({
   RENDER_CACHE_MAX_ENTRIES: z.coerce.number().int().min(10).max(5000).default(500)
 });
 
-const parsedEnv = parseServiceEnv("worker", envSchema, process.env);
+const parsedEnv = parseServiceEnv("worker", envSchema, {
+  ...process.env,
+  REDIS_URL: firstDefinedEnv(process.env.REDIS_URL, process.env.REDIS_PRIVATE_URL, process.env.REDIS_PUBLIC_URL)
+});
 
 if (parsedEnv.NODE_ENV === "production" && !parsedEnv.WORKER_INTERNAL_TOKEN) {
   throw new Error("WORKER_INTERNAL_TOKEN must be set in production.");
