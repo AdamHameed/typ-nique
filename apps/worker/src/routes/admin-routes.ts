@@ -11,7 +11,9 @@ export async function adminRoutes(app: FastifyInstance) {
     if (!isAuthorized(request.headers["x-render-admin-token"])) {
       logSecurityEvent("worker-admin-auth-rejected", {
         requestId: request.id,
-        ip: request.ip
+        ip: request.ip,
+        method: request.method,
+        path: request.url
       });
 
       return reply.code(401).send({

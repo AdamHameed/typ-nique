@@ -11,7 +11,7 @@ async function main() {
 
   process.stdout.write(validate.stdout);
 
-  const seed = await runCommand("pnpm", ["db:seed"]);
+  const seed = await runCommand("pnpm", ["db:seed:content"]);
   process.stdout.write(seed.stdout);
   process.stderr.write(seed.stderr);
 

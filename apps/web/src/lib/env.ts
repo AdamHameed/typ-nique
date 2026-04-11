@@ -47,24 +47,30 @@ export const publicEnv = {
 
 let cachedServerEnv: (typeof publicEnv & { API_INTERNAL_URL: string | undefined }) | null = null;
 
-export function getServerEnv() {
-  if (cachedServerEnv) {
-    return cachedServerEnv;
-  }
+function normalizeLoopbackUrl(url: string | undefined) {
+  return url?.replace("://localhost", "://127.0.0.1");
+}
 
+export function resolveServerApiOrigin() {
   const parsedServerEnv = parseServiceEnv("web-server", serverEnvSchema, process.env);
   const internalApiUrl =
-    parsedServerEnv.API_INTERNAL_URL ??
-    publicEnv.NEXT_PUBLIC_API_URL?.replace("://localhost", "://127.0.0.1") ??
-    (isProduction ? undefined : "http://127.0.0.1:4000");
+    parsedServerEnv.API_INTERNAL_URL ?? normalizeLoopbackUrl(publicEnv.NEXT_PUBLIC_API_URL) ?? (isProduction ? undefined : "http://127.0.0.1:4000");
 
   if (isProduction && !internalApiUrl) {
     throw new Error("API_INTERNAL_URL or NEXT_PUBLIC_API_URL must be set in production.");
   }
 
+  return internalApiUrl;
+}
+
+export function getServerEnv() {
+  if (cachedServerEnv) {
+    return cachedServerEnv;
+  }
+
   cachedServerEnv = {
     ...publicEnv,
-    API_INTERNAL_URL: internalApiUrl
+    API_INTERNAL_URL: resolveServerApiOrigin()
   };
 
   return cachedServerEnv;

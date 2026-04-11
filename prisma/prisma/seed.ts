@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { createHash, randomBytes, scryptSync } from "node:crypto";
 import { normalizeSource, normalizeSvgMarkup, svgFingerprint } from "@typ-nique/typst-utils";
-import { prisma } from "../src/index.js";
+import { prisma } from "../dist/index.js";
 import { demoUsers, leaderboardSeeds } from "../seeds/demo-data.js";
 import {
   buildChallengeDescription,

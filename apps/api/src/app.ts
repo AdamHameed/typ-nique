@@ -2,10 +2,12 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
 import { ZodError } from "zod";
+import type { ApiRuntimeState } from "./lib/startup.js";
 import { authRoutes } from "./routes/auth-routes.js";
 import { challengeRoutes } from "./routes/challenge-routes.js";
 import { isAllowedBrowserOrigin } from "./lib/browser-origin.js";
 import { env } from "./lib/env.js";
+import { apiLogRedactPaths } from "./lib/logger.js";
 import { logSecurityEvent } from "./lib/security-observability.js";
 import { gameSessionRoutes } from "./routes/game-session-routes.js";
 import { leaderboardRoutes } from "./routes/leaderboard-routes.js";
@@ -13,26 +15,27 @@ import { multiplayerRoutes } from "./routes/multiplayer-routes.js";
 import { renderRoutes } from "./routes/render-routes.js";
 import { submissionRoutes } from "./routes/submission-routes.js";
 
-export function buildApp() {
+export function buildApp(options: {
+  runtimeState: ApiRuntimeState;
+  refreshReadiness: () => Promise<boolean>;
+}) {
   const app = Fastify({
     bodyLimit: env.API_BODY_LIMIT_BYTES,
     requestTimeout: env.API_REQUEST_TIMEOUT_MS,
     requestIdHeader: "x-request-id",
     trustProxy: env.TRUST_PROXY,
     logger: {
-      level: env.NODE_ENV === "production" ? "info" : "debug",
-      redact: [
-        "req.headers.cookie",
-        "req.headers.authorization",
-        "req.headers[\"x-worker-internal-token\"]",
-        "req.headers[\"x-render-admin-token\"]",
-        "res.headers[\"set-cookie\"]"
-      ],
+      level: env.LOG_LEVEL,
+      redact: [...apiLogRedactPaths],
       transport:
         env.NODE_ENV === "development"
           ? {
               target: "pino-pretty",
-              options: { colorize: true }
+              options: {
+                colorize: true,
+                singleLine: true,
+                translateTime: "SYS:standard"
+              }
             }
           : undefined
     }
@@ -48,7 +51,17 @@ export function buildApp() {
 
   app.get("/health", async (_request, reply) => {
     reply.header("Cache-Control", "no-store");
-    return { ok: true };
+    const dependenciesReady = await options.refreshReadiness();
+    const ok = options.runtimeState.ready && !options.runtimeState.shuttingDown && dependenciesReady;
+
+    return reply.code(ok ? 200 : 503).send({
+      ok,
+      ready: options.runtimeState.ready,
+      shuttingDown: options.runtimeState.shuttingDown,
+      startedAt: options.runtimeState.startedAt,
+      lastDependencyCheckAt: options.runtimeState.lastDependencyCheckAt,
+      checks: options.runtimeState.checks
+    });
   });
   app.register(authRoutes);
   app.register(challengeRoutes);
@@ -103,7 +116,7 @@ export function buildApp() {
         err: error,
         requestId: request.id
       },
-      "Unhandled API error"
+      "api-unhandled-error"
     );
 
     return reply.code(500).send({

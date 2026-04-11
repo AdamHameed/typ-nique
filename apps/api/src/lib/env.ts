@@ -2,6 +2,10 @@ import { parseServiceEnv } from "@typ-nique/validation";
 import { z } from "zod";
 import { parseAllowedBrowserOrigins } from "./browser-origin.js";
 
+function firstDefinedEnv(...values: Array<string | undefined>) {
+  return values.find((value) => value !== undefined);
+}
+
 const optionalString = z.preprocess((value) => {
   if (typeof value === "string" && value.trim() === "") {
     return undefined;
@@ -42,10 +46,14 @@ const optionalBoolean = z.preprocess((value) => {
 
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+  LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).optional(),
   PORT: optionalNumber,
   API_PORT: z.coerce.number().default(4000),
   API_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120000).default(15000),
   API_BODY_LIMIT_BYTES: z.coerce.number().int().min(1024).max(131072).default(16 * 1024),
+  API_STARTUP_CHECK_TIMEOUT_MS: z.coerce.number().int().min(1000).max(30000).default(5000),
+  API_STARTUP_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(60).default(12),
+  API_STARTUP_RETRY_DELAY_MS: z.coerce.number().int().min(250).max(30000).default(2000),
   DATABASE_URL: z.string().min(1),
   WORKER_RENDER_URL: optionalUrl,
   WORKER_INTERNAL_TOKEN: z.string().min(1).optional(),
@@ -76,7 +84,12 @@ const envSchema = z.object({
   SUBMISSION_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(90)
 });
 
-const parsedEnv = parseServiceEnv("api", envSchema, process.env);
+const parsedEnv = parseServiceEnv("api", envSchema, {
+  ...process.env,
+  DATABASE_URL: firstDefinedEnv(process.env.DATABASE_URL, process.env.DATABASE_PRIVATE_URL, process.env.DATABASE_PUBLIC_URL),
+  REDIS_URL: firstDefinedEnv(process.env.REDIS_URL, process.env.REDIS_PRIVATE_URL, process.env.REDIS_PUBLIC_URL),
+  WORKER_RENDER_URL: firstDefinedEnv(process.env.WORKER_RENDER_URL, process.env.WORKER_PRIVATE_URL)
+});
 const defaultWorkerRenderUrl = parsedEnv.NODE_ENV === "production" ? undefined : "http://127.0.0.1:4100";
 const workerRenderUrl = parsedEnv.WORKER_RENDER_URL ?? defaultWorkerRenderUrl;
 const authCookieSecure = parsedEnv.AUTH_COOKIE_SECURE ?? parsedEnv.NODE_ENV === "production";
@@ -109,6 +122,8 @@ if (parsedEnv.AUTH_COOKIE_NAME === parsedEnv.GUEST_COOKIE_NAME) {
 
 export const env = {
   ...parsedEnv,
+  LOG_LEVEL:
+    parsedEnv.LOG_LEVEL ?? (parsedEnv.NODE_ENV === "development" ? "debug" : parsedEnv.NODE_ENV === "test" ? "error" : "info"),
   API_PORT: parsedEnv.PORT ?? parsedEnv.API_PORT,
   WORKER_RENDER_URL: workerRenderUrl,
   AUTH_COOKIE_SECURE: authCookieSecure,

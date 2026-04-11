@@ -136,3 +136,8 @@ docker compose -f infra/compose/docker-compose.dev.yml run --rm setup
 - [Advanced answer checker](/Users/adam/Downloads/Projects/typ-nique/docs/advanced-answer-checker.md)
 - [Production security hardening](/Users/adam/Downloads/Projects/typ-nique/docs/production-security.md)
 - [Railway deployment](/Users/adam/Downloads/Projects/typ-nique/docs/railway-deployment.md)
+
+Railway note:
+
+- Production deployment is image-based. CI publishes immutable GHCR images for `web`, `api`, and `worker`, and Railway should pull those images directly rather than building from source or using compose.
+- Use the `railway-image-manifest` artifact from the `Container Images` workflow and pin Railway to the immutable `sha-<shortsha>@digest` references.
