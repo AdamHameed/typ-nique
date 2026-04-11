@@ -1,0 +1,120 @@
+# Production-like local compose stack.
+# This file is for locally exercising the pulled runtime images in a Railway-like shape.
+# It intentionally avoids bind mounts, runtime source dependencies, and startup bootstrap containers.
+
+name: ${COMPOSE_PROJECT_NAME:-typnique-prod}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-typ_nique}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-typ_nique}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_prod_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+
+  api:
+    image: ${TYPNIQUE_API_IMAGE:?Set TYPNIQUE_API_IMAGE to a GHCR or local image ref}
+    pull_policy: always
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 8080
+      LOG_LEVEL: ${API_LOG_LEVEL:-info}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-typ_nique}
+      DIRECT_DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-typ_nique}
+      REDIS_URL: redis://redis:6379
+      WORKER_RENDER_URL: http://worker:8080
+      WORKER_INTERNAL_TOKEN: ${WORKER_INTERNAL_TOKEN:?Set WORKER_INTERNAL_TOKEN in your compose env file}
+      ALLOWED_BROWSER_ORIGINS: ${ALLOWED_BROWSER_ORIGINS:-http://localhost:3000}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+      TRUST_PROXY: "true"
+    ports:
+      - "${API_PORT:-4000}:8080"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/health', { cache: 'no-store' }).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    tmpfs:
+      - /tmp:size=64m
+    pids_limit: 128
+
+  worker:
+    image: ${TYPNIQUE_WORKER_IMAGE:?Set TYPNIQUE_WORKER_IMAGE to a GHCR or local image ref}
+    pull_policy: always
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 8080
+      LOG_LEVEL: ${WORKER_LOG_LEVEL:-info}
+      REDIS_URL: redis://redis:6379
+      WORKER_INTERNAL_TOKEN: ${WORKER_INTERNAL_TOKEN:?Set WORKER_INTERNAL_TOKEN in your compose env file}
+      ENABLE_RENDER_ADMIN: ${ENABLE_RENDER_ADMIN:-false}
+      TYPST_TIMEOUT_MS: ${TYPST_TIMEOUT_MS:-4000}
+      TYPST_MAX_MEMORY_KB: ${TYPST_MAX_MEMORY_KB:-524288}
+      TYPST_MAX_CONCURRENT_RENDERS: ${TYPST_MAX_CONCURRENT_RENDERS:-2}
+    ports:
+      - "${WORKER_PORT:-4100}:8080"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/health', { cache: 'no-store' }).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    mem_limit: 768m
+    cpus: 1.0
+    pids_limit: 128
+    tmpfs:
+      - /tmp:size=128m
+
+  web:
+    image: ${TYPNIQUE_WEB_IMAGE:?Set TYPNIQUE_WEB_IMAGE to a GHCR or local image ref}
+    pull_policy: always
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 8080
+      API_INTERNAL_URL: http://api:8080
+      NEXT_PUBLIC_MULTIPLAYER_GATEWAY_URL: ${NEXT_PUBLIC_MULTIPLAYER_GATEWAY_URL:-ws://localhost:4000}
+    ports:
+      - "${WEB_PORT:-3000}:8080"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/api/health', { cache: 'no-store' }).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    tmpfs:
+      - /tmp:size=64m
+    pids_limit: 128
+
+volumes:
+  postgres_prod_data:
+  redis_prod_data:

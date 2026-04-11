@@ -20,6 +20,7 @@ Key production decisions in this setup:
 - Railway private networking is used for all server-to-server traffic.
 - Production deployments are pinned to immutable image refs, not moving tags.
 - The local compose `setup` container stays development-only and is not used in production.
+- A separate [docker-compose.prod.yml](/Users/adam/Downloads/Projects/typ-nique/infra/compose/docker-compose.prod.yml) exists only for local image-based smoke testing of the same runtime images.
 
 ## Service architecture
 

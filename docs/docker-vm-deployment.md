@@ -16,6 +16,37 @@ Use [docker-compose.dev.yml](/Users/adam/Downloads/Projects/typ-nique/infra/comp
 docker compose -f infra/compose/docker-compose.dev.yml up --build
 ```
 
+## Local production-like image run
+
+Use [docker-compose.prod.yml](/Users/adam/Downloads/Projects/typ-nique/infra/compose/docker-compose.prod.yml) when you want to locally exercise the pulled runtime images in a shape that is much closer to Railway:
+
+```bash
+cp infra/compose/.env.prod.example infra/compose/.env.prod
+docker compose --env-file infra/compose/.env.prod -f infra/compose/docker-compose.prod.yml pull
+docker compose --env-file infra/compose/.env.prod -f infra/compose/docker-compose.prod.yml up -d
+```
+
+What this gives you:
+
+- prebuilt `web`, `api`, and `worker` images only
+- local Postgres and Redis backing services
+- no bind mounts
+- no runtime source checkout dependency
+- no startup/bootstrap setup container
+
+What it does not do:
+
+- it does not replace Railway
+- it does not run migrations automatically
+- it does not auto-seed content
+
+Apply schema and content manually from the repo root once the stack is up:
+
+```bash
+DATABASE_URL='postgresql://postgres:postgres@127.0.0.1:5432/typ_nique' DIRECT_DATABASE_URL='postgresql://postgres:postgres@127.0.0.1:5432/typ_nique' pnpm db:deploy
+DATABASE_URL='postgresql://postgres:postgres@127.0.0.1:5432/typ_nique' DIRECT_DATABASE_URL='postgresql://postgres:postgres@127.0.0.1:5432/typ_nique' pnpm db:seed:content
+```
+
 ## Production image strategy
 
 Use the production Dockerfiles:
@@ -54,6 +85,13 @@ Recommended production values:
 - `WORKER_RENDER_URL=http://worker:4100`
 - keep `WORKER_INTERNAL_TOKEN` and `RENDER_ADMIN_TOKEN` long and random
 - leave multiplayer diagnostics disabled unless you intentionally need them in production
+
+For [docker-compose.prod.yml](/Users/adam/Downloads/Projects/typ-nique/infra/compose/docker-compose.prod.yml), service-to-service URLs intentionally mirror the Railway pattern:
+
+- `web -> api`: `http://api:8080`
+- `api -> worker`: `http://worker:8080`
+- browser -> `web`: `http://localhost:3000`
+- browser WebSockets -> `api`: `ws://localhost:4000`
 
 ## Volume strategy
 

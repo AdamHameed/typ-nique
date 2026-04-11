@@ -29,3 +29,4 @@ Key rules:
 - Railway services should be pinned to immutable `sha-<shortsha>@digest` refs
 - Railway-managed Postgres and Redis should be used where possible
 - local compose and setup containers stay development-only
+- [docker-compose.prod.yml](/Users/adam/Downloads/Projects/typ-nique/infra/compose/docker-compose.prod.yml) is allowed only as a local production-like image test harness, not as the production orchestrator

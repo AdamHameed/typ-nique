@@ -5,6 +5,7 @@ dist
 .env
 .env.local
 .env.*.local
+infra/compose/.env.prod
 coverage
 *.log
 prisma/dev.db

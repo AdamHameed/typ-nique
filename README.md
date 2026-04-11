@@ -122,6 +122,28 @@ If you need to rerun the container bootstrap manually:
 docker compose -f infra/compose/docker-compose.dev.yml run --rm setup
 ```
 
+If you want to run the pulled production images locally in a Railway-like shape, use the image-based compose stack instead:
+
+```bash
+cp infra/compose/.env.prod.example infra/compose/.env.prod
+pnpm docker:prod:pull
+pnpm docker:prod:start
+```
+
+That stack:
+
+- pulls `web`, `api`, and `worker` images instead of building from source
+- uses local Postgres and Redis containers
+- avoids bind mounts and startup bootstrap containers
+- keeps migrations and content seeding as manual one-off steps
+
+After the stack is up, apply schema and seed only challenge content from the repo root:
+
+```bash
+DATABASE_URL='postgresql://postgres:postgres@127.0.0.1:5432/typ_nique' DIRECT_DATABASE_URL='postgresql://postgres:postgres@127.0.0.1:5432/typ_nique' pnpm db:deploy
+DATABASE_URL='postgresql://postgres:postgres@127.0.0.1:5432/typ_nique' DIRECT_DATABASE_URL='postgresql://postgres:postgres@127.0.0.1:5432/typ_nique' pnpm db:seed:content
+```
+
 ## Troubleshooting
 
 - If `pnpm dev` says `.env` is missing, run `cp .env.example .env`.
@@ -141,3 +163,4 @@ Railway note:
 
 - Production deployment is image-based. CI publishes immutable GHCR images for `web`, `api`, and `worker`, and Railway should pull those images directly rather than building from source or using compose.
 - Use the `railway-image-manifest` artifact from the `Container Images` workflow and pin Railway to the immutable `sha-<shortsha>@digest` references.
+- [docker-compose.prod.yml](/Users/adam/Downloads/Projects/typ-nique/infra/compose/docker-compose.prod.yml) is only for local prod-like smoke testing of those same images. It is not the production runtime or orchestrator.
