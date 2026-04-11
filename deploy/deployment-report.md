@@ -88,7 +88,7 @@ Adding partial `railway.toml` files here would create more confusion than value.
 
 ## First production deploy checklist
 
-1. Merge to `main` or create a release tag.
+1. Merge to `prod` or create a release tag.
 2. Wait for `Container Images` to publish GHCR images.
 3. Download `railway-image-manifest`.
 4. Create or update Railway services with the immutable refs.

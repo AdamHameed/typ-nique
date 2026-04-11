@@ -21,7 +21,7 @@ This keeps image deploys reproducible and makes rollback much safer.
 
 ## Image-based deployment flow
 
-1. Merge the production change to `main`, or push a release tag like `v1.2.3`.
+1. Merge the production change to `prod`, or push a release tag like `v1.2.3`.
 2. Wait for the `Container Images` workflow to finish.
 3. Download the `railway-image-manifest` artifact.
 4. Copy the immutable `reference` values for `web`, `api`, and `worker`.

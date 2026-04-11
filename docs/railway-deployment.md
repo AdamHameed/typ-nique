@@ -271,7 +271,7 @@ Do not use `prisma migrate dev` on Railway.
 
 ## Practical deployment order
 
-1. Merge to `main` or push a release tag.
+1. Merge to `prod` or push a release tag.
 2. Wait for the `Container Images` workflow to finish.
 3. Download the `railway-image-manifest` artifact.
 4. Provision Railway Postgres and Redis.

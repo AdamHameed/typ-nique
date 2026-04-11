@@ -3,12 +3,14 @@ name: Container Images
 on:
   push:
     branches:
-      - "**"
+      - prod
+      - production
     tags:
       - "v*"
   pull_request:
     branches:
-      - "**"
+      - prod
+      - production
   workflow_dispatch:
 
 concurrency:
